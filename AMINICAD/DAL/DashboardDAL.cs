@@ -24,10 +24,10 @@ namespace AMINICAD.DAL
 
             const string sql = @"
 SELECT
-    TotalMes  = ISNULL(SUM(CASE WHEN A.Fecha >= @InicioMes AND A.Fecha < @FinMes THEN A.Total ELSE 0 END), 0),
+    TotalMes  = ISNULL(SUM(CASE WHEN A.Fecha >= @InicioMes AND A.Fecha < =@FinMes THEN A.Total ELSE 0 END), 0),
     TotalAnio = ISNULL(SUM(A.Total), 0)
 FROM tbIngresosMaestros A
-WHERE A.Fecha >= @InicioAnio AND A.Fecha < @FinAnio;";
+WHERE A.Fecha >= @InicioAnio AND A.Fecha <= @FinAnio;";
 
             using var cn = new SqlConnection(_cs);
             await cn.OpenAsync(ct);

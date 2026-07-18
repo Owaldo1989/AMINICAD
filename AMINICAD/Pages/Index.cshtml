@@ -1,179 +1,1027 @@
 ﻿@page
 @model AMINICAD.Pages.IndexModel
+
 @{
     ViewData["Title"] = "Dashboard";
+
+    var cultura =
+        System.Globalization.CultureInfo.GetCultureInfo("es-NI");
+
+    var movimientos =
+        Model.SerieMensual
+            .Where(x => x.Total > 0)
+            .ToList();
+
+    var mesesConMovimiento = movimientos.Count;
+
+    var promedioMensual =
+        mesesConMovimiento > 0
+            ? movimientos.Average(x => x.Total)
+            : 0;
+
+    var mejorMes =
+        movimientos
+            .OrderByDescending(x => x.Total)
+            .FirstOrDefault();
+
+    var mesesOrdenados =
+        movimientos
+            .OrderByDescending(x => x.Total)
+            .Take(6)
+            .ToList();
+
+    var montoMayorMes =
+        mesesOrdenados.Count > 0
+            ? mesesOrdenados.Max(x => x.Total)
+            : 0;
+
+    var totalAnioActual =
+        Model.SerieComparativo4Anios
+            .Where(x => x.Anio == Model.AnioSeleccionado)
+            .Sum(x => x.Total);
+
+    var totalAnioAnterior =
+        Model.SerieComparativo4Anios
+            .Where(x => x.Anio == Model.AnioSeleccionado - 1)
+            .Sum(x => x.Total);
+
+    var variacionAnual =
+        totalAnioAnterior > 0
+            ? ((totalAnioActual - totalAnioAnterior)
+                / totalAnioAnterior) * 100
+            : 0;
+
+    var variacionPositiva =
+        variacionAnual >= 0;
+
+    var mesActualNombre =
+        cultura.DateTimeFormat
+            .GetMonthName(Model.MesActual);
+
+    mesActualNombre =
+        string.IsNullOrWhiteSpace(mesActualNombre)
+            ? Model.MesActual.ToString()
+            : char.ToUpper(mesActualNombre[0], cultura)
+              + mesActualNombre.Substring(1);
+
+    var mejorMesTexto =
+        mejorMes is null
+            ? "Sin datos"
+            : mejorMes.Mes;
 }
 
-<div class="container py-4">
+<div class="dashboard-container">
 
-    <!-- Encabezado + Filtro -->
-    <div class="d-flex align-items-center justify-content-between mb-3">
+    <!-- ENCABEZADO -->
+    <div class="page-header">
+
         <div>
-            <h3 class="mb-0">Dashboard</h3>
-            <div class="text-muted small">Resumen de ingresos</div>
+
+            <div class="page-pretitle">
+                Resumen ejecutivo
+            </div>
+
+            <h1 class="page-title">
+                Dashboard financiero
+            </h1>
+
+            <p class="page-description">
+                Comportamiento de los ingresos y comparación histórica de AMINICAD.
+            </p>
+
         </div>
 
-        <form method="get" class="d-flex align-items-center gap-2">
-            <label class="text-muted small mb-0">Año</label>
-            <select class="form-select form-select-sm" name="anio" onchange="this.form.submit()">
-                @foreach (var y in Model.OpcionesAnio)
-                {
-                    <option value="@y" selected="@(y == Model.AnioSeleccionado ? "selected" : null)">@y</option>
-                }
-            </select>
-        </form>
+        <div class="page-actions">
+
+            <span class="status-chip">
+                Información actualizada
+            </span>
+
+            <form method="get"
+                  class="filter-card">
+
+                <label for="anio">
+                    Año
+                </label>
+
+                <select id="anio"
+                        name="anio"
+                        class="form-select"
+                        onchange="this.form.submit()">
+
+                    @foreach (var y in Model.OpcionesAnio)
+                    {
+                        <option value="@y"
+                                selected="@(y == Model.AnioSeleccionado
+                                                                    ? "selected"
+                                                                    : null)">
+                            @y
+                        </option>
+                    }
+
+                </select>
+
+            </form>
+
+        </div>
+
     </div>
 
-    <!-- KPIs -->
+
+    <!-- INDICADORES -->
+    <div class="row g-3 mb-3">
+
+        <div class="col-12 col-sm-6 col-xl-3">
+
+            <article class="kpi-card"
+                     style="--kpi-accent:#1f2758; --kpi-soft:#eef0f8;">
+
+                <div class="kpi-card-body">
+
+                    <div class="kpi-icon">
+                        <i class="bi bi-calendar2-week"></i>
+                    </div>
+
+                    <div class="kpi-content">
+
+                        <div class="kpi-label">
+                            Ingresos de @mesActualNombre
+                        </div>
+
+                        <div class="kpi-value">
+                            C$ @Model.Kpis.TotalMes.ToString("N2")
+                        </div>
+
+                        <div class="kpi-note">
+                            Período @Model.MesActual/@Model.AnioSeleccionado
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </article>
+
+        </div>
+
+
+        <div class="col-12 col-sm-6 col-xl-3">
+
+            <article class="kpi-card"
+                     style="--kpi-accent:#d8292f; --kpi-soft:#fdeced;">
+
+                <div class="kpi-card-body">
+
+                    <div class="kpi-icon">
+                        <i class="bi bi-cash-stack"></i>
+                    </div>
+
+                    <div class="kpi-content">
+
+                        <div class="kpi-label">
+                            Acumulado del año
+                        </div>
+
+                        <div class="kpi-value">
+                            C$ @Model.Kpis.TotalAnio.ToString("N2")
+                        </div>
+
+                        @if (totalAnioAnterior > 0)
+                        {
+                            <div class="kpi-note @(variacionPositiva ? "positive" : "negative")">
+
+                                <i class="bi @(variacionPositiva
+                                                                       ? "bi-arrow-up-right"
+                                                                       : "bi-arrow-down-right")">
+                                </i>
+
+                                @Math.Abs(variacionAnual).ToString("N1")%
+                                frente a @(Model.AnioSeleccionado - 1)
+
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="kpi-note">
+                                Sin comparación disponible
+                            </div>
+                        }
+
+                    </div>
+
+                </div>
+
+            </article>
+
+        </div>
+
+
+        <div class="col-12 col-sm-6 col-xl-3">
+
+            <article class="kpi-card"
+                     style="--kpi-accent:#16803c; --kpi-soft:#eaf7ef;">
+
+                <div class="kpi-card-body">
+
+                    <div class="kpi-icon">
+                        <i class="bi bi-graph-up-arrow"></i>
+                    </div>
+
+                    <div class="kpi-content">
+
+                        <div class="kpi-label">
+                            Promedio mensual
+                        </div>
+
+                        <div class="kpi-value">
+                            C$ @promedioMensual.ToString("N2")
+                        </div>
+
+                        <div class="kpi-note">
+                            Calculado sobre @mesesConMovimiento
+                            @(mesesConMovimiento == 1 ? "mes" : "meses")
+                            con movimiento
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </article>
+
+        </div>
+
+
+        <div class="col-12 col-sm-6 col-xl-3">
+
+            <article class="kpi-card"
+                     style="--kpi-accent:#c76b05; --kpi-soft:#fff4df;">
+
+                <div class="kpi-card-body">
+
+                    <div class="kpi-icon">
+                        <i class="bi bi-trophy"></i>
+                    </div>
+
+                    <div class="kpi-content">
+
+                        <div class="kpi-label">
+                            Mes con mayor ingreso
+                        </div>
+
+                        <div class="kpi-value">
+                            @mejorMesTexto
+                        </div>
+
+                        <div class="kpi-note">
+                            @if (mejorMes is not null)
+                            {
+                                <span>
+                                    C$ @mejorMes.Total.ToString("N2")
+                                </span>
+                            }
+                            else
+                            {
+                                <span>
+                                    No hay movimientos para este año
+                                </span>
+                            }
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </article>
+
+        </div>
+
+    </div>
+
+
+    <!-- GRÁFICA PRINCIPAL + RESUMEN -->
+    <div class="row g-3 mb-3">
+
+        <div class="col-12 col-xl-8">
+
+            <section class="dashboard-card">
+
+                <header class="dashboard-card-header">
+
+                    <div class="card-heading">
+                        <h2>Comportamiento mensual</h2>
+                        <p>Ingresos registrados durante @Model.AnioSeleccionado</p>
+                    </div>
+
+                    <span class="card-badge">
+                        @Model.AnioSeleccionado
+                    </span>
+
+                </header>
+
+                <div class="dashboard-card-body">
+
+                    <div class="chart-container chart-large">
+
+                        <canvas id="chartIngresosAnio">
+                        </canvas>
+
+                        <div id="noDataIngresos"
+                             class="no-data">
+
+                            <div class="no-data-icon">
+                                <i class="bi bi-bar-chart"></i>
+                            </div>
+
+                            <strong>
+                                No hay ingresos registrados
+                            </strong>
+
+                            <span>
+                                No se encontraron movimientos para
+                                @Model.AnioSeleccionado.
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        </div>
+
+
+        <div class="col-12 col-xl-4">
+
+            <section class="dashboard-card">
+
+                <header class="dashboard-card-header">
+
+                    <div class="card-heading">
+                        <h2>Resumen del período</h2>
+                        <p>Indicadores calculados con los datos disponibles</p>
+                    </div>
+
+                </header>
+
+                <div class="dashboard-card-body">
+
+                    <div class="summary-list">
+
+                        <div class="summary-item">
+
+                            <div class="summary-icon">
+                                <i class="bi bi-calendar-check"></i>
+                            </div>
+
+                            <div class="summary-copy">
+                                <span>Meses con movimiento</span>
+                                <strong>
+                                    @mesesConMovimiento de 12 meses
+                                </strong>
+                            </div>
+
+                            <div class="summary-value">
+                                @((mesesConMovimiento / 12m * 100).ToString("N0"))%
+                            </div>
+
+                        </div>
+
+
+                        <div class="summary-item">
+
+                            <div class="summary-icon">
+                                <i class="bi bi-award"></i>
+                            </div>
+
+                            <div class="summary-copy">
+                                <span>Mejor mes</span>
+                                <strong>@mejorMesTexto</strong>
+                            </div>
+
+                            <div class="summary-value">
+                                @(mejorMes is null
+                                    ? "C$ 0.00"
+                                    : $"C$ {mejorMes.Total:N2}")
+                            </div>
+
+                        </div>
+
+
+                        <div class="summary-item">
+
+                            <div class="summary-icon">
+                                <i class="bi bi-calculator"></i>
+                            </div>
+
+                            <div class="summary-copy">
+                                <span>Promedio mensual</span>
+                                <strong>Meses con ingresos</strong>
+                            </div>
+
+                            <div class="summary-value">
+                                C$ @promedioMensual.ToString("N2")
+                            </div>
+
+                        </div>
+
+
+                        <div class="summary-item">
+
+                            <div class="summary-icon">
+                                <i class="bi bi-arrow-left-right"></i>
+                            </div>
+
+                            <div class="summary-copy">
+                                <span>Variación anual</span>
+                                <strong>
+                                    @Model.AnioSeleccionado vs.
+                                    @(Model.AnioSeleccionado - 1)
+                                </strong>
+                            </div>
+
+                            <div class="summary-value">
+                                @if (totalAnioAnterior > 0)
+                                {
+                                    <span>
+                                        @(variacionAnual >= 0 ? "+" : "")
+                                        @variacionAnual.ToString("N1")%
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span>N/D</span>
+                                }
+                            </div>
+
+                        </div>
+
+
+                        <div class="summary-item">
+
+                            <div class="summary-icon">
+                                <i class="bi bi-calendar-month"></i>
+                            </div>
+
+                            <div class="summary-copy">
+                                <span>Mes consultado</span>
+                                <strong>@mesActualNombre</strong>
+                            </div>
+
+                            <div class="summary-value">
+                                C$ @Model.Kpis.TotalMes.ToString("N2")
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        </div>
+
+    </div>
+
+
+    <!-- COMPARATIVO + MEJORES MESES -->
     <div class="row g-3">
-        <div class="col-12 col-lg-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">Ingresos del mes (@Model.MesActual/@Model.AnioSeleccionado)</div>
-                    <div class="display-6 fw-semibold">@Model.Kpis.TotalMes.ToString("N2")</div>
+
+        <div class="col-12 col-xl-8">
+
+            <section class="dashboard-card">
+
+                <header class="dashboard-card-header">
+
+                    <div class="card-heading">
+                        <h2>Comparativo histórico</h2>
+                        <p>
+                            Evolución mensual de los últimos cuatro años
+                        </p>
+                    </div>
+
+                    <span class="card-badge">
+                        @(Model.AnioSeleccionado - 3)
+                        —
+                        @Model.AnioSeleccionado
+                    </span>
+
+                </header>
+
+                <div class="dashboard-card-body">
+
+                    <div class="chart-container">
+
+                        <canvas id="chartComparativo4Anios">
+                        </canvas>
+
+                        <div id="noDataComparativo"
+                             class="no-data">
+
+                            <div class="no-data-icon">
+                                <i class="bi bi-graph-up"></i>
+                            </div>
+
+                            <strong>
+                                No existe información histórica
+                            </strong>
+
+                            <span>
+                                No se encontraron datos para los años seleccionados.
+                            </span>
+
+                        </div>
+
+                    </div>
+
                 </div>
-            </div>
+
+            </section>
+
         </div>
 
-        <div class="col-12 col-lg-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="text-muted small">Acumulado del año (@Model.AnioSeleccionado)</div>
-                    <div class="display-6 fw-semibold">@Model.Kpis.TotalAnio.ToString("N2")</div>
+
+        <div class="col-12 col-xl-4">
+
+            <section class="dashboard-card">
+
+                <header class="dashboard-card-header">
+
+                    <div class="card-heading">
+                        <h2>Meses destacados</h2>
+                        <p>Meses con mayor recaudación del año</p>
+                    </div>
+
+                    <span class="card-badge">
+                        Top @mesesOrdenados.Count
+                    </span>
+
+                </header>
+
+                <div class="dashboard-card-body">
+
+                    @if (mesesOrdenados.Count > 0)
+                    {
+                        <div class="month-list">
+
+                            @foreach (var mes in mesesOrdenados)
+                            {
+                                var porcentaje =
+                                    montoMayorMes > 0
+                                        ? mes.Total / montoMayorMes * 100
+                                        : 0;
+
+                                <div class="month-row">
+
+                                    <div class="month-name">
+                                        @mes.Mes
+                                    </div>
+
+                                    <div class="month-progress">
+
+                                        <div class="month-progress-bar"
+                                             style="width:@porcentaje.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%">
+                                        </div>
+
+                                    </div>
+
+                                    <div class="month-amount">
+                                        C$ @mes.Total.ToString("N2")
+                                    </div>
+
+                                </div>
+                            }
+
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="no-data show">
+
+                            <div class="no-data-icon">
+                                <i class="bi bi-calendar-x"></i>
+                            </div>
+
+                            <strong>
+                                No hay meses para mostrar
+                            </strong>
+
+                            <span>
+                                Selecciona un año que tenga movimientos.
+                            </span>
+
+                        </div>
+                    }
+
                 </div>
-            </div>
+
+            </section>
+
         </div>
+
     </div>
 
-    <!-- Gráficas -->
-    <div class="row g-3 mt-1">
-        <!-- Gráfica 1: Año seleccionado -->
-        <div class="col-12 col-lg-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="fw-semibold">Ingresos por mes</div>
-                        <div class="text-muted small">@Model.AnioSeleccionado</div>
-                    </div>
-
-                    <div style="height: 320px;">
-                        <canvas id="chartIngresosAnio"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Gráfica 2: Comparativo 4 años -->
-        <div class="col-12 col-lg-6">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div class="fw-semibold">Comparativo últimos 4 años</div>
-                        <div class="text-muted small">@Model.AnioSeleccionado - 3 a @Model.AnioSeleccionado</div>
-                    </div>
-
-                    <div style="height: 320px;">
-                        <canvas id="chartComparativo4Anios"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
+
 @section Scripts {
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js">
+    </script>
 
     <script>
         (function () {
-            const nf = new Intl.NumberFormat('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-            // -------------------------
-            // Chart 1: Año seleccionado
-            // -------------------------
-            const labelsAnio = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SerieMensual.Select(x => x.Mes)));
-            const valuesAnio = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SerieMensual.Select(x => x.Total)));
+            const currencyFormatter =
+                new Intl.NumberFormat(
+                    "es-NI",
+                    {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
 
-            const ctx1 = document.getElementById('chartIngresosAnio');
-            if (ctx1) {
-                new Chart(ctx1, {
-                    type: 'line',
-                    data: {
-                        labels: labelsAnio,
-                        datasets: [{
-                            label: 'Ingresos',
-                            data: valuesAnio,
-                            tension: 0.25,
-                            pointRadius: 3,
+            const compactFormatter =
+                new Intl.NumberFormat(
+                    "es-NI",
+                    {
+                        notation: "compact",
+                        maximumFractionDigits: 1
+                    });
+
+            const selectedYear =
+                @Model.AnioSeleccionado;
+
+            const primaryColor =
+                "#1f2758";
+
+            const redColor =
+                "#d8292f";
+
+            const gridColor =
+                "#e8ebf2";
+
+            const mutedColor =
+                "#667085";
+
+            function money(value) {
+                return `C$ ${currencyFormatter.format(value ?? 0)}`;
+            }
+
+            function compactMoney(value) {
+                return `C$ ${compactFormatter.format(value ?? 0)}`;
+            }
+
+            Chart.defaults.font.family =
+                "Inter, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+
+            Chart.defaults.color =
+                mutedColor;
+
+
+            // ==================================================
+            // GRÁFICA DEL AÑO
+            // ==================================================
+
+            const labelsAnio =
+                @Html.Raw(
+                        System.Text.Json.JsonSerializer.Serialize(
+                                Model.SerieMensual.Select(x => x.Mes)));
+
+            const valuesAnio =
+                @Html.Raw(
+                        System.Text.Json.JsonSerializer.Serialize(
+                                Model.SerieMensual.Select(x => x.Total)));
+
+            const hasIngresos =
+                valuesAnio.some(value => Number(value) > 0);
+
+            const chartIngresos =
+                document.getElementById("chartIngresosAnio");
+
+            const noDataIngresos =
+                document.getElementById("noDataIngresos");
+
+            if (!hasIngresos) {
+
+                if (chartIngresos) {
+                    chartIngresos.style.display = "none";
+                }
+
+                noDataIngresos?.classList.add("show");
+
+            } else if (chartIngresos) {
+
+                const context =
+                    chartIngresos.getContext("2d");
+
+                const gradient =
+                    context.createLinearGradient(
+                        0,
+                        0,
+                        0,
+                        330);
+
+                gradient.addColorStop(
+                    0,
+                    "rgba(31, 39, 88, 0.20)");
+
+                gradient.addColorStop(
+                    1,
+                    "rgba(31, 39, 88, 0.01)");
+
+                new Chart(
+                    chartIngresos,
+                    {
+                        type: "line",
+
+                        data: {
+                            labels: labelsAnio,
+
+                            datasets: [{
+                                label: "Ingresos",
+                                data: valuesAnio,
+                                borderColor: primaryColor,
+                                backgroundColor: gradient,
+                                borderWidth: 3,
+                                pointRadius: 3,
+                                pointHoverRadius: 6,
+                                pointBackgroundColor: "#ffffff",
+                                pointBorderColor: primaryColor,
+                                pointBorderWidth: 2,
+                                tension: 0.35,
+                                fill: true
+                            }]
+                        },
+
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {
+                                mode: "index",
+                                intersect: false
+                            },
+
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+
+                                tooltip: {
+                                    backgroundColor: "#151b42",
+                                    padding: 12,
+                                    displayColors: false,
+
+                                    callbacks: {
+                                        label: function (context) {
+                                            return money(context.parsed.y);
+                                        }
+                                    }
+                                }
+                            },
+
+                            scales: {
+                                x: {
+                                    grid: {
+                                        display: false
+                                    },
+
+                                    border: {
+                                        display: false
+                                    },
+
+                                    ticks: {
+                                        color: mutedColor,
+                                        font: {
+                                            size: 11
+                                        }
+                                    }
+                                },
+
+                                y: {
+                                    beginAtZero: true,
+
+                                    grid: {
+                                        color: gridColor,
+                                        drawTicks: false
+                                    },
+
+                                    border: {
+                                        display: false
+                                    },
+
+                                    ticks: {
+                                        padding: 10,
+
+                                        callback: function (value) {
+                                            return compactMoney(value);
+                                        },
+
+                                        font: {
+                                            size: 11
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+            }
+
+
+            // ==================================================
+            // COMPARATIVO DE 4 AÑOS
+            // ==================================================
+
+            const rows =
+                @Html.Raw(
+                        System.Text.Json.JsonSerializer.Serialize(
+                                Model.SerieComparativo4Anios));
+
+            const hasComparativo =
+                rows.some(row => Number(row.Total) > 0);
+
+            const chartComparativo =
+                document.getElementById("chartComparativo4Anios");
+
+            const noDataComparativo =
+                document.getElementById("noDataComparativo");
+
+            if (!hasComparativo) {
+
+                if (chartComparativo) {
+                    chartComparativo.style.display = "none";
+                }
+
+                noDataComparativo?.classList.add("show");
+
+            } else if (chartComparativo) {
+
+                const labelsMes = [
+                    "Ene",
+                    "Feb",
+                    "Mar",
+                    "Abr",
+                    "May",
+                    "Jun",
+                    "Jul",
+                    "Ago",
+                    "Sep",
+                    "Oct",
+                    "Nov",
+                    "Dic"
+                ];
+
+                const years =
+                    [...new Set(
+                        rows.map(row => row.Anio))]
+                        .sort((a, b) => a - b);
+
+                const historicColors = [
+                    "#c4c9d8",
+                    "#9099b5",
+                    redColor,
+                    primaryColor
+                ];
+
+                const datasets =
+                    years.map(function (year, index) {
+
+                        const data =
+                            new Array(12).fill(0);
+
+                        rows
+                            .filter(row => row.Anio === year)
+                            .forEach(function (row) {
+
+                                const position =
+                                    row.IdMes - 1;
+
+                                if (position >= 0 &&
+                                    position < 12) {
+
+                                    data[position] =
+                                        row.Total;
+                                }
+                            });
+
+                        const isCurrentYear =
+                            year === selectedYear;
+
+                        return {
+                            label: year.toString(),
+                            data: data,
+                            borderColor:
+                                historicColors[
+                                    Math.min(
+                                        index,
+                                        historicColors.length - 1)],
+                            backgroundColor: "transparent",
+                            borderWidth:
+                                isCurrentYear ? 3 : 2,
+                            pointRadius:
+                                isCurrentYear ? 3 : 1.5,
                             pointHoverRadius: 5,
+                            tension: 0.32,
                             fill: false
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: true },
-                            tooltip: {
-                                callbacks: {
-                                    label: (c) => ` ${c.dataset.label}: ${nf.format(c.parsed.y)}`
+                        };
+                    });
+
+                new Chart(
+                    chartComparativo,
+                    {
+                        type: "line",
+
+                        data: {
+                            labels: labelsMes,
+                            datasets: datasets
+                        },
+
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {
+                                mode: "index",
+                                intersect: false
+                            },
+
+                            plugins: {
+                                legend: {
+                                    position: "top",
+                                    align: "end",
+
+                                    labels: {
+                                        usePointStyle: true,
+                                        pointStyle: "circle",
+                                        boxWidth: 7,
+                                        boxHeight: 7,
+                                        padding: 15,
+
+                                        font: {
+                                            size: 11
+                                        }
+                                    }
+                                },
+
+                                tooltip: {
+                                    backgroundColor: "#151b42",
+                                    padding: 12,
+
+                                    callbacks: {
+                                        label: function (context) {
+                                            return `${context.dataset.label}: ${money(context.parsed.y)}`;
+                                        }
+                                    }
+                                }
+                            },
+
+                            scales: {
+                                x: {
+                                    grid: {
+                                        display: false
+                                    },
+
+                                    border: {
+                                        display: false
+                                    },
+
+                                    ticks: {
+                                        font: {
+                                            size: 11
+                                        }
+                                    }
+                                },
+
+                                y: {
+                                    beginAtZero: true,
+
+                                    grid: {
+                                        color: gridColor,
+                                        drawTicks: false
+                                    },
+
+                                    border: {
+                                        display: false
+                                    },
+
+                                    ticks: {
+                                        padding: 10,
+
+                                        callback: function (value) {
+                                            return compactMoney(value);
+                                        },
+
+                                        font: {
+                                            size: 11
+                                        }
+                                    }
                                 }
                             }
-                        },
-                        scales: {
-                            y: { ticks: { callback: (v) => nf.format(v) } }
                         }
-                    }
-                });
+                    });
             }
 
-            // -------------------------
-            // Chart 2: Comparativo 4 años
-            // -------------------------
-            const rows = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SerieComparativo4Anios));
-
-            const labelsMes = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-            const years = [...new Set(rows.map(r => r.Anio))].sort((a,b) => a-b);
-
-            const datasets = years.map(y => {
-                const data = new Array(12).fill(0);
-                rows.filter(r => r.Anio === y).forEach(r => {
-                    const idx = r.IdMes - 1;
-                    if (idx >= 0 && idx < 12) data[idx] = r.Total;
-                });
-
-                return {
-                    label: y.toString(),
-                    data,
-                    tension: 0.25,
-                    pointRadius: 2,
-                    pointHoverRadius: 4,
-                    fill: false
-                };
-            });
-
-            const ctx2 = document.getElementById('chartComparativo4Anios');
-            if (ctx2) {
-                new Chart(ctx2, {
-                    type: 'line',
-                    data: { labels: labelsMes, datasets },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: true },
-                            tooltip: {
-                                callbacks: {
-                                    label: (c) => ` ${c.dataset.label}: ${nf.format(c.parsed.y)}`
-                                }
-                            }
-                        },
-                        scales: {
-                            y: { ticks: { callback: (v) => nf.format(v) } }
-                        }
-                    }
-                });
-            }
         })();
     </script>
 }
