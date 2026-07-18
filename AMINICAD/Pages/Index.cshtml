@@ -1,0 +1,179 @@
+﻿@page
+@model AMINICAD.Pages.IndexModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="container py-4">
+
+    <!-- Encabezado + Filtro -->
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <div>
+            <h3 class="mb-0">Dashboard</h3>
+            <div class="text-muted small">Resumen de ingresos</div>
+        </div>
+
+        <form method="get" class="d-flex align-items-center gap-2">
+            <label class="text-muted small mb-0">Año</label>
+            <select class="form-select form-select-sm" name="anio" onchange="this.form.submit()">
+                @foreach (var y in Model.OpcionesAnio)
+                {
+                    <option value="@y" selected="@(y == Model.AnioSeleccionado ? "selected" : null)">@y</option>
+                }
+            </select>
+        </form>
+    </div>
+
+    <!-- KPIs -->
+    <div class="row g-3">
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small">Ingresos del mes (@Model.MesActual/@Model.AnioSeleccionado)</div>
+                    <div class="display-6 fw-semibold">@Model.Kpis.TotalMes.ToString("N2")</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="text-muted small">Acumulado del año (@Model.AnioSeleccionado)</div>
+                    <div class="display-6 fw-semibold">@Model.Kpis.TotalAnio.ToString("N2")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficas -->
+    <div class="row g-3 mt-1">
+        <!-- Gráfica 1: Año seleccionado -->
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="fw-semibold">Ingresos por mes</div>
+                        <div class="text-muted small">@Model.AnioSeleccionado</div>
+                    </div>
+
+                    <div style="height: 320px;">
+                        <canvas id="chartIngresosAnio"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfica 2: Comparativo 4 años -->
+        <div class="col-12 col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="fw-semibold">Comparativo últimos 4 años</div>
+                        <div class="text-muted small">@Model.AnioSeleccionado - 3 a @Model.AnioSeleccionado</div>
+                    </div>
+
+                    <div style="height: 320px;">
+                        <canvas id="chartComparativo4Anios"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <script>
+        (function () {
+            const nf = new Intl.NumberFormat('es-NI', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            // -------------------------
+            // Chart 1: Año seleccionado
+            // -------------------------
+            const labelsAnio = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SerieMensual.Select(x => x.Mes)));
+            const valuesAnio = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SerieMensual.Select(x => x.Total)));
+
+            const ctx1 = document.getElementById('chartIngresosAnio');
+            if (ctx1) {
+                new Chart(ctx1, {
+                    type: 'line',
+                    data: {
+                        labels: labelsAnio,
+                        datasets: [{
+                            label: 'Ingresos',
+                            data: valuesAnio,
+                            tension: 0.25,
+                            pointRadius: 3,
+                            pointHoverRadius: 5,
+                            fill: false
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true },
+                            tooltip: {
+                                callbacks: {
+                                    label: (c) => ` ${c.dataset.label}: ${nf.format(c.parsed.y)}`
+                                }
+                            }
+                        },
+                        scales: {
+                            y: { ticks: { callback: (v) => nf.format(v) } }
+                        }
+                    }
+                });
+            }
+
+            // -------------------------
+            // Chart 2: Comparativo 4 años
+            // -------------------------
+            const rows = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SerieComparativo4Anios));
+
+            const labelsMes = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+            const years = [...new Set(rows.map(r => r.Anio))].sort((a,b) => a-b);
+
+            const datasets = years.map(y => {
+                const data = new Array(12).fill(0);
+                rows.filter(r => r.Anio === y).forEach(r => {
+                    const idx = r.IdMes - 1;
+                    if (idx >= 0 && idx < 12) data[idx] = r.Total;
+                });
+
+                return {
+                    label: y.toString(),
+                    data,
+                    tension: 0.25,
+                    pointRadius: 2,
+                    pointHoverRadius: 4,
+                    fill: false
+                };
+            });
+
+            const ctx2 = document.getElementById('chartComparativo4Anios');
+            if (ctx2) {
+                new Chart(ctx2, {
+                    type: 'line',
+                    data: { labels: labelsMes, datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: true },
+                            tooltip: {
+                                callbacks: {
+                                    label: (c) => ` ${c.dataset.label}: ${nf.format(c.parsed.y)}`
+                                }
+                            }
+                        },
+                        scales: {
+                            y: { ticks: { callback: (v) => nf.format(v) } }
+                        }
+                    }
+                });
+            }
+        })();
+    </script>
+}
