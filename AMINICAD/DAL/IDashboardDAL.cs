@@ -4,8 +4,18 @@ namespace AMINICAD.DAL
 {
     public interface IDashboardDAL
     {
-        Task<DashboardKpis> GetKpisAsync(int anio, int mes, CancellationToken ct = default);
-        Task<List<IngresoMensual>> GetIngresosPorMesAsync(int anio, CancellationToken ct = default);
-        Task<List<IngresoMensual>> GetIngresosComparativo4AniosAsync(int anio, CancellationToken ct = default);
+        Task<DashboardAdministrativo> GetDashboardAsync(
+            DateTime fechaInicial,
+            DateTime fechaFinal,
+            int? idRegion = null,
+            int? idDistrito = null,
+            int? idMisionero = null,
+            int? idIglesia = null,
+            int? idTipoMision = null,
+            CancellationToken ct = default);
+
+        Task<List<IngresoMensual>> GetIngresosComparativo4AniosAsync(
+            int anio,
+            CancellationToken ct = default);
     }
 }

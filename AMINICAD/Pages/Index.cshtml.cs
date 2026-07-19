@@ -5,53 +5,196 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace AMINICAD.Pages
 {
-    public class IndexModel : PageModel
+    public sealed class IndexModel : PageModel
     {
-        private readonly IDashboardDAL _dal;
+        private readonly IDashboardDAL _dashboardDAL;
 
-        public IndexModel(IDashboardDAL dal)
+        public IndexModel(
+            IDashboardDAL dashboardDAL)
         {
-            _dal = dal;
+            _dashboardDAL =
+                dashboardDAL;
         }
+
 
         [BindProperty(SupportsGet = true)]
         public int? Anio { get; set; }
 
+
+        [BindProperty(SupportsGet = true)]
+        public int? IdRegion { get; set; }
+
+
+        [BindProperty(SupportsGet = true)]
+        public int? IdDistrito { get; set; }
+
+
+        [BindProperty(SupportsGet = true)]
+        public int? IdMisionero { get; set; }
+
+
+        [BindProperty(SupportsGet = true)]
+        public int? IdIglesia { get; set; }
+
+
+        [BindProperty(SupportsGet = true)]
+        public int? IdTipoMision { get; set; }
+
+
         public int AnioSeleccionado { get; private set; }
+
         public int MesActual { get; private set; }
 
-        public DashboardKpis Kpis { get; private set; } = new DashboardKpis();
+        public DateTime FechaInicial { get; private set; }
 
-        // Gráfica 1: 12 meses del año seleccionado
-        public List<IngresoMensual> SerieMensual { get; private set; } = new List<IngresoMensual>();
+        public DateTime FechaFinal { get; private set; }
 
-        // Gráfica 2: 4 años (anio-3..anio) x 12 meses
-        public List<IngresoMensual> SerieComparativo4Anios { get; private set; } = new List<IngresoMensual>();
 
-        public List<int> OpcionesAnio { get; private set; } = new List<int>();
+        /*
+         * Resultado completo del nuevo procedimiento.
+         */
+        public DashboardAdministrativo Dashboard { get; private set; } =
+            new();
 
-        public async Task OnGetAsync(CancellationToken ct)
+
+        /*
+         * Propiedades de compatibilidad.
+         *
+         * Permiten que el Index.cshtml actual continÃºe funcionando
+         * mientras incorporamos las nuevas secciones.
+         */
+        public DashboardKpis Kpis { get; private set; } =
+            new();
+
+        public List<IngresoMensual> SerieMensual { get; private set; } =
+            new();
+
+        public List<IngresoMensual> SerieComparativo4Anios
         {
-            AnioSeleccionado = ValidarAnio(Anio);
-            MesActual = DateTime.Today.Month;
+            get;
+            private set;
+        } = new();
 
-            // últimos 6 años (ajuste a gusto)
-            OpcionesAnio = Enumerable.Range(DateTime.Today.Year - 5, 6).Reverse().ToList();
 
-            Kpis = await _dal.GetKpisAsync(AnioSeleccionado, MesActual, ct);
-            SerieMensual = await _dal.GetIngresosPorMesAsync(AnioSeleccionado, ct);
-            SerieComparativo4Anios = await _dal.GetIngresosComparativo4AniosAsync(AnioSeleccionado, ct);
+        public List<int> OpcionesAnio { get; private set; } =
+            new();
+
+
+        public async Task OnGetAsync(
+            CancellationToken ct)
+        {
+            AnioSeleccionado =
+                ValidarAnio(Anio);
+
+            MesActual =
+                DateTime.Today.Month;
+
+            FechaInicial =
+                new DateTime(
+                    AnioSeleccionado,
+                    1,
+                    1);
+
+            FechaFinal =
+                new DateTime(
+                    AnioSeleccionado,
+                    12,
+                    31);
+
+            OpcionesAnio =
+                Enumerable
+                    .Range(
+                        DateTime.Today.Year - 5,
+                        6)
+                    .Reverse()
+                    .ToList();
+
+
+            /*
+             * Ejecutamos de forma secuencial para evitar abrir dos
+             * conexiones simultÃ¡neas durante perÃ­odos de presiÃ³n en SQL Server.
+             */
+            Dashboard =
+                await _dashboardDAL.GetDashboardAsync(
+                    FechaInicial,
+                    FechaFinal,
+                    IdRegion,
+                    IdDistrito,
+                    IdMisionero,
+                    IdIglesia,
+                    IdTipoMision,
+                    ct);
+
+            SerieComparativo4Anios =
+                await _dashboardDAL
+                    .GetIngresosComparativo4AniosAsync(
+                        AnioSeleccionado,
+                        ct);
+
+
+            /*
+             * Convertimos la serie nueva al modelo que ya utiliza
+             * Index.cshtml.
+             */
+            SerieMensual =
+                Dashboard.Mensual
+                    .Select(
+                        x => new IngresoMensual
+                        {
+                            Anio = x.Anio,
+                            IdMes = x.IdMes,
+                            Mes = x.Mes,
+                            Total = x.TotalBruto
+                        })
+                    .OrderBy(x => x.IdMes)
+                    .ToList();
+
+
+            /*
+             * Alimentamos las tarjetas actuales.
+             */
+            Kpis =
+                new DashboardKpis
+                {
+                    TotalAnio =
+                        Dashboard.Resumen.TotalBruto,
+
+                    TotalMes =
+                        Dashboard.Mensual
+                            .Where(
+                                x =>
+                                    x.Anio ==
+                                    AnioSeleccionado
+                                    &&
+                                    x.IdMes ==
+                                    MesActual)
+                            .Select(
+                                x => x.TotalBruto)
+                            .FirstOrDefault()
+                };
         }
 
-        private static int ValidarAnio(int? anio)
+
+        private static int ValidarAnio(
+            int? anio)
         {
-            var actual = DateTime.Today.Year;
-            var y = anio ?? actual;
+            var anioActual =
+                DateTime.Today.Year;
 
-            if (y < 2000) return actual;
-            if (y > actual) return actual;
+            var resultado =
+                anio ?? anioActual;
 
-            return y;
+            if (resultado < 2000)
+            {
+                return anioActual;
+            }
+
+            if (resultado > anioActual)
+            {
+                return anioActual;
+            }
+
+            return resultado;
         }
     }
 }

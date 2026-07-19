@@ -7,138 +7,804 @@ namespace AMINICAD.DAL
 {
     public sealed class DashboardDAL : IDashboardDAL
     {
-        private readonly string _cs;
+        private readonly string _connectionString;
 
-        public DashboardDAL(IConfiguration config)
+        public DashboardDAL(IConfiguration configuration)
         {
-            _cs = config.GetConnectionString("DefaultConnection")
-                  ?? throw new InvalidOperationException("Falta ConnectionStrings:DefaultConnection en appsettings.json");
+            _connectionString =
+                configuration.GetConnectionString("DefaultConnection")
+                ?? throw new InvalidOperationException(
+                    "No se encontró ConnectionStrings:DefaultConnection.");
         }
-        public async Task<DashboardKpis> GetKpisAsync(int anio, int mes, CancellationToken ct = default)
+
+
+        public async Task<DashboardAdministrativo> GetDashboardAsync(
+            DateTime fechaInicial,
+            DateTime fechaFinal,
+            int? idRegion = null,
+            int? idDistrito = null,
+            int? idMisionero = null,
+            int? idIglesia = null,
+            int? idTipoMision = null,
+            CancellationToken ct = default)
         {
-            var inicioAnio = new DateTime(anio, 1, 1);
-            var finAnio = inicioAnio.AddYears(1);
-
-            var inicioMes = new DateTime(anio, mes, 1);
-            var finMes = inicioMes.AddMonths(1);
-
-            const string sql = @"
-SELECT
-    TotalMes  = ISNULL(SUM(CASE WHEN A.Fecha >= @InicioMes AND A.Fecha < =@FinMes THEN A.Total ELSE 0 END), 0),
-    TotalAnio = ISNULL(SUM(A.Total), 0)
-FROM tbIngresosMaestros A
-WHERE A.Fecha >= @InicioAnio AND A.Fecha <= @FinAnio;";
-
-            using var cn = new SqlConnection(_cs);
-            await cn.OpenAsync(ct);
-
-            using var cmd = new SqlCommand(sql, cn);
-            cmd.Parameters.Add("@InicioAnio", SqlDbType.DateTime).Value = inicioAnio;
-            cmd.Parameters.Add("@FinAnio", SqlDbType.DateTime).Value = finAnio;
-            cmd.Parameters.Add("@InicioMes", SqlDbType.DateTime).Value = inicioMes;
-            cmd.Parameters.Add("@FinMes", SqlDbType.DateTime).Value = finMes;
-
-            using var rd = await cmd.ExecuteReaderAsync(ct);
-
-            var kpi = new DashboardKpis();
-            if (await rd.ReadAsync(ct))
+            if (fechaFinal.Date < fechaInicial.Date)
             {
-                kpi.TotalMes = rd.GetDecimal(0);
-                kpi.TotalAnio = rd.GetDecimal(1);
+                throw new ArgumentException(
+                    "La fecha final no puede ser menor que la fecha inicial.");
             }
 
-            return kpi;
-        }
+            var resultado = new DashboardAdministrativo();
 
-        public async Task<List<IngresoMensual>> GetIngresosPorMesAsync(int anio, CancellationToken ct = default)
-        {
-            const string sql = @"
-;WITH Meses AS
-(
-    SELECT 1 AS IdMes UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
-    UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8
-    UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL SELECT 12
-),
-Totales AS
-(
-    SELECT
-        IdMes = MONTH(A.Fecha),
-        Total = SUM(A.Total)
-    FROM tbIngresosMaestros A
-    WHERE A.Fecha >= @InicioAnio AND A.Fecha < @FinAnio
-    GROUP BY MONTH(A.Fecha)
-)
-SELECT
-    IdMes = M.IdMes,
-    Total = ISNULL(T.Total, 0)
-FROM Meses M
-LEFT JOIN Totales T ON T.IdMes = M.IdMes
-ORDER BY M.IdMes;";
+            await using var conexion =
+                new SqlConnection(_connectionString);
 
-            var inicioAnio = new DateTime(anio, 1, 1);
-            var finAnio = inicioAnio.AddYears(1);
+            await conexion.OpenAsync(ct);
 
-            using var cn = new SqlConnection(_cs);
-            await cn.OpenAsync(ct);
+            await using var comando =
+                new SqlCommand(
+                    "dbo.SpDashboardAMINICAD",
+                    conexion);
 
-            using var cmd = new SqlCommand(sql, cn);
-            cmd.Parameters.Add("@InicioAnio", SqlDbType.DateTime).Value = inicioAnio;
-            cmd.Parameters.Add("@FinAnio", SqlDbType.DateTime).Value = finAnio;
+            comando.CommandType =
+                CommandType.StoredProcedure;
 
-            using var rd = await cmd.ExecuteReaderAsync(ct);
+            comando.CommandTimeout =
+                180;
 
-            var culture = CultureInfo.GetCultureInfo("es-NI");
-            var list = new List<IngresoMensual>(12);
+            comando.Parameters
+                .Add("@FechaInicial", SqlDbType.Date)
+                .Value = fechaInicial.Date;
 
-            while (await rd.ReadAsync(ct))
+            comando.Parameters
+                .Add("@FechaFinal", SqlDbType.Date)
+                .Value = fechaFinal.Date;
+
+            AgregarParametroEnteroOpcional(
+                comando,
+                "@IdRegion",
+                idRegion);
+
+            AgregarParametroEnteroOpcional(
+                comando,
+                "@IdDistrito",
+                idDistrito);
+
+            AgregarParametroEnteroOpcional(
+                comando,
+                "@IdMisionero",
+                idMisionero);
+
+            AgregarParametroEnteroOpcional(
+                comando,
+                "@IdIglesia",
+                idIglesia);
+
+            AgregarParametroEnteroOpcional(
+                comando,
+                "@IdTipoMision",
+                idTipoMision);
+
+            await using var reader =
+                await comando.ExecuteReaderAsync(ct);
+
+
+            /*
+             * RESULTADO 1:
+             * KPI y resumen general.
+             */
+            if (await reader.ReadAsync(ct))
             {
-                var idMes = rd.GetInt32(0);
-                var total = rd.GetDecimal(1);
+                resultado.Resumen =
+                    new DashboardResumen
+                    {
+                        FechaInicial =
+                            LeerFecha(
+                                reader,
+                                "FechaInicial"),
 
-                var mesNombre = culture.DateTimeFormat.GetMonthName(idMes);
-                if (!string.IsNullOrWhiteSpace(mesNombre))
-                    mesNombre = char.ToUpper(mesNombre[0], culture) + mesNombre.Substring(1);
+                        FechaFinal =
+                            LeerFecha(
+                                reader,
+                                "FechaFinal"),
 
-                list.Add(new IngresoMensual
+                        TotalBruto =
+                            LeerDecimal(
+                                reader,
+                                "TotalBruto"),
+
+                        NetoBeneficiarios =
+                            LeerDecimal(
+                                reader,
+                                "NetoBeneficiarios"),
+
+                        TotalRetenciones =
+                            LeerDecimal(
+                                reader,
+                                "TotalRetenciones"),
+
+                        OtrosConceptos =
+                            LeerDecimal(
+                                reader,
+                                "OtrosConceptos"),
+
+                        TotalDistribuido =
+                            LeerDecimal(
+                                reader,
+                                "TotalDistribuido"),
+
+                        DiferenciaDistribucion =
+                            LeerDecimal(
+                                reader,
+                                "DiferenciaDistribucion"),
+
+                        CantidadIngresos =
+                            LeerEntero(
+                                reader,
+                                "CantidadIngresos"),
+
+                        CantidadRecibos =
+                            LeerEntero(
+                                reader,
+                                "CantidadRecibos"),
+
+                        CantidadIglesias =
+                            LeerEntero(
+                                reader,
+                                "CantidadIglesias"),
+
+                        CantidadMisioneros =
+                            LeerEntero(
+                                reader,
+                                "CantidadMisioneros"),
+
+                        CantidadRegiones =
+                            LeerEntero(
+                                reader,
+                                "CantidadRegiones"),
+
+                        CantidadDistritos =
+                            LeerEntero(
+                                reader,
+                                "CantidadDistritos"),
+
+                        PromedioAporte =
+                            LeerDecimal(
+                                reader,
+                                "PromedioAporte"),
+
+                        MedianaAporte =
+                            LeerDecimal(
+                                reader,
+                                "MedianaAporte"),
+
+                        PorcentajeNeto =
+                            LeerDecimal(
+                                reader,
+                                "PorcentajeNeto"),
+
+                        PorcentajeRetenciones =
+                            LeerDecimal(
+                                reader,
+                                "PorcentajeRetenciones")
+                    };
+            }
+
+
+            /*
+             * RESULTADO 2:
+             * Comportamiento mensual.
+             */
+            if (await reader.NextResultAsync(ct))
+            {
+                while (await reader.ReadAsync(ct))
                 {
-                    Anio = anio,
-                    IdMes = idMes,
-                    Total = total,
-                    Mes = mesNombre
-                });
+                    resultado.Mensual.Add(
+                        new DashboardMensual
+                        {
+                            Periodo =
+                                LeerFecha(
+                                    reader,
+                                    "Periodo"),
+
+                            Anio =
+                                LeerEntero(
+                                    reader,
+                                    "Anio"),
+
+                            IdMes =
+                                LeerEntero(
+                                    reader,
+                                    "IdMes"),
+
+                            Mes =
+                                FormatearNombreMes(
+                                    LeerTexto(
+                                        reader,
+                                        "Mes")),
+
+                            TotalBruto =
+                                LeerDecimal(
+                                    reader,
+                                    "TotalBruto"),
+
+                            NetoBeneficiarios =
+                                LeerDecimal(
+                                    reader,
+                                    "NetoBeneficiarios"),
+
+                            Retenciones =
+                                LeerDecimal(
+                                    reader,
+                                    "Retenciones"),
+
+                            OtrosConceptos =
+                                LeerDecimal(
+                                    reader,
+                                    "OtrosConceptos"),
+
+                            CantidadRecibos =
+                                LeerEntero(
+                                    reader,
+                                    "CantidadRecibos"),
+
+                            Iglesias =
+                                LeerEntero(
+                                    reader,
+                                    "Iglesias"),
+
+                            Misioneros =
+                                LeerEntero(
+                                    reader,
+                                    "Misioneros")
+                        });
+                }
             }
 
-            return list;
-        }
 
-        public async Task<List<IngresoMensual>> GetIngresosComparativo4AniosAsync(int anio, CancellationToken ct = default)
-        {
-            const string sp = "dbo.SpDashboard_IngresosComparativo4Anios_Meses";
-
-            using var cn = new SqlConnection(_cs);
-            await cn.OpenAsync(ct);
-
-            using var cmd = new SqlCommand(sp, cn);
-            cmd.CommandType = CommandType.StoredProcedure;
-            cmd.Parameters.Add("@Anio", SqlDbType.Int).Value = anio;
-
-            using var rd = await cmd.ExecuteReaderAsync(ct);
-
-            var list = new List<IngresoMensual>(48);
-            while (await rd.ReadAsync(ct))
+            /*
+             * RESULTADO 3:
+             * Distribución por concepto.
+             */
+            if (await reader.NextResultAsync(ct))
             {
-                list.Add(new IngresoMensual
+                while (await reader.ReadAsync(ct))
                 {
-                    Anio = rd.GetInt32(0),
-                    IdMes = rd.GetInt32(1),
-                    Total = rd.GetDecimal(2),
-                    Mes = "" // opcional; para la gráfica usaremos IdMes
-                });
+                    resultado.Distribucion.Add(
+                        new DashboardDistribucion
+                        {
+                            IdRetencion =
+                                LeerEnteroNullable(
+                                    reader,
+                                    "IdRetencion"),
+
+                            Concepto =
+                                LeerTexto(
+                                    reader,
+                                    "Concepto"),
+
+                            TipoDistribucion =
+                                LeerTexto(
+                                    reader,
+                                    "TipoDistribucion"),
+
+                            Monto =
+                                LeerDecimal(
+                                    reader,
+                                    "Monto"),
+
+                            CantidadRecibos =
+                                LeerEntero(
+                                    reader,
+                                    "CantidadRecibos"),
+
+                            PorcentajeTotal =
+                                LeerDecimal(
+                                    reader,
+                                    "PorcentajeTotal")
+                        });
+                }
             }
 
-            return list;
+
+            /*
+             * RESULTADO 4:
+             * Regiones.
+             */
+            if (await reader.NextResultAsync(ct))
+            {
+                while (await reader.ReadAsync(ct))
+                {
+                    resultado.Regiones.Add(
+                        new DashboardRegion
+                        {
+                            IdRegion =
+                                LeerEnteroNullable(
+                                    reader,
+                                    "IdRegion"),
+
+                            Region =
+                                LeerTexto(
+                                    reader,
+                                    "Region"),
+
+                            TotalRecaudado =
+                                LeerDecimal(
+                                    reader,
+                                    "TotalRecaudado"),
+
+                            CantidadRecibos =
+                                LeerEntero(
+                                    reader,
+                                    "CantidadRecibos"),
+
+                            Iglesias =
+                                LeerEntero(
+                                    reader,
+                                    "Iglesias"),
+
+                            Misioneros =
+                                LeerEntero(
+                                    reader,
+                                    "Misioneros"),
+
+                            PromedioAporte =
+                                LeerDecimal(
+                                    reader,
+                                    "PromedioAporte"),
+
+                            UltimoAporte =
+                                LeerFechaNullable(
+                                    reader,
+                                    "UltimoAporte")
+                        });
+                }
+            }
+
+
+            /*
+             * RESULTADO 5:
+             * Distritos principales.
+             */
+            if (await reader.NextResultAsync(ct))
+            {
+                while (await reader.ReadAsync(ct))
+                {
+                    resultado.Distritos.Add(
+                        new DashboardDistrito
+                        {
+                            IdRegion =
+                                LeerEnteroNullable(
+                                    reader,
+                                    "IdRegion"),
+
+                            Region =
+                                LeerTexto(
+                                    reader,
+                                    "Region"),
+
+                            IdDistrito =
+                                LeerEnteroNullable(
+                                    reader,
+                                    "IdDistrito"),
+
+                            Distrito =
+                                LeerTexto(
+                                    reader,
+                                    "Distrito"),
+
+                            TotalRecaudado =
+                                LeerDecimal(
+                                    reader,
+                                    "TotalRecaudado"),
+
+                            CantidadRecibos =
+                                LeerEntero(
+                                    reader,
+                                    "CantidadRecibos"),
+
+                            Iglesias =
+                                LeerEntero(
+                                    reader,
+                                    "Iglesias"),
+
+                            Misioneros =
+                                LeerEntero(
+                                    reader,
+                                    "Misioneros"),
+
+                            PromedioAporte =
+                                LeerDecimal(
+                                    reader,
+                                    "PromedioAporte"),
+
+                            UltimoAporte =
+                                LeerFechaNullable(
+                                    reader,
+                                    "UltimoAporte")
+                        });
+                }
+            }
+
+
+            /*
+             * RESULTADO 6:
+             * Misioneros y beneficiarios.
+             */
+            if (await reader.NextResultAsync(ct))
+            {
+                while (await reader.ReadAsync(ct))
+                {
+                    resultado.Misioneros.Add(
+                        new DashboardMisionero
+                        {
+                            IdMisionero =
+                                LeerEnteroNullable(
+                                    reader,
+                                    "IdMisionero"),
+
+                            Misionero =
+                                LeerTexto(
+                                    reader,
+                                    "Misionero"),
+
+                            TotalBruto =
+                                LeerDecimal(
+                                    reader,
+                                    "TotalBruto"),
+
+                            Neto =
+                                LeerDecimal(
+                                    reader,
+                                    "Neto"),
+
+                            Retenciones =
+                                LeerDecimal(
+                                    reader,
+                                    "Retenciones"),
+
+                            Otros =
+                                LeerDecimal(
+                                    reader,
+                                    "Otros"),
+
+                            CantidadRecibos =
+                                LeerEntero(
+                                    reader,
+                                    "CantidadRecibos"),
+
+                            Iglesias =
+                                LeerEntero(
+                                    reader,
+                                    "Iglesias"),
+
+                            UltimoAporte =
+                                LeerFechaNullable(
+                                    reader,
+                                    "UltimoAporte")
+                        });
+                }
+            }
+
+
+            /*
+             * RESULTADO 7:
+             * Iglesias y donantes.
+             */
+            if (await reader.NextResultAsync(ct))
+            {
+                while (await reader.ReadAsync(ct))
+                {
+                    resultado.Iglesias.Add(
+                        new DashboardIglesia
+                        {
+                            IdIglesia =
+                                LeerEnteroNullable(
+                                    reader,
+                                    "IdIglesia"),
+
+                            Iglesia =
+                                LeerTexto(
+                                    reader,
+                                    "Iglesia"),
+
+                            IdRegion =
+                                LeerEnteroNullable(
+                                    reader,
+                                    "IdRegion"),
+
+                            Region =
+                                LeerTexto(
+                                    reader,
+                                    "Region"),
+
+                            IdDistrito =
+                                LeerEnteroNullable(
+                                    reader,
+                                    "IdDistrito"),
+
+                            Distrito =
+                                LeerTexto(
+                                    reader,
+                                    "Distrito"),
+
+                            TotalAportado =
+                                LeerDecimal(
+                                    reader,
+                                    "TotalAportado"),
+
+                            CantidadRecibos =
+                                LeerEntero(
+                                    reader,
+                                    "CantidadRecibos"),
+
+                            MisionerosApoyados =
+                                LeerEntero(
+                                    reader,
+                                    "MisionerosApoyados"),
+
+                            PromedioAporte =
+                                LeerDecimal(
+                                    reader,
+                                    "PromedioAporte"),
+
+                            PrimeraAportacion =
+                                LeerFechaNullable(
+                                    reader,
+                                    "PrimeraAportacion"),
+
+                            UltimaAportacion =
+                                LeerFechaNullable(
+                                    reader,
+                                    "UltimaAportacion")
+                        });
+                }
+            }
+
+
+            /*
+             * RESULTADO 8:
+             * Control de calidad.
+             */
+            if (await reader.NextResultAsync(ct) &&
+                await reader.ReadAsync(ct))
+            {
+                resultado.Calidad =
+                    new DashboardCalidadDatos
+                    {
+                        RecibosSinIglesia =
+                            LeerEntero(
+                                reader,
+                                "RecibosSinIglesia"),
+
+                        RecibosSinMisionero =
+                            LeerEntero(
+                                reader,
+                                "RecibosSinMisionero"),
+
+                        RecibosSinRegion =
+                            LeerEntero(
+                                reader,
+                                "RecibosSinRegion"),
+
+                        RecibosSinDistrito =
+                            LeerEntero(
+                                reader,
+                                "RecibosSinDistrito"),
+
+                        FilasSinConcepto =
+                            LeerEntero(
+                                reader,
+                                "FilasSinConcepto"),
+
+                        ConceptosNoClasificados =
+                            LeerEntero(
+                                reader,
+                                "ConceptosNoClasificados"),
+
+                        RecibosDescuadrados =
+                            LeerEntero(
+                                reader,
+                                "RecibosDescuadrados"),
+
+                        DiferenciaTotal =
+                            LeerDecimal(
+                                reader,
+                                "DiferenciaTotal")
+                    };
+            }
+
+            return resultado;
         }
 
 
+        public async Task<List<IngresoMensual>>
+            GetIngresosComparativo4AniosAsync(
+                int anio,
+                CancellationToken ct = default)
+        {
+            const string procedimiento =
+                "dbo.SpDashboard_IngresosComparativo4Anios_Meses";
+
+            var resultado =
+                new List<IngresoMensual>(48);
+
+            await using var conexion =
+                new SqlConnection(_connectionString);
+
+            await conexion.OpenAsync(ct);
+
+            await using var comando =
+                new SqlCommand(
+                    procedimiento,
+                    conexion);
+
+            comando.CommandType =
+                CommandType.StoredProcedure;
+
+            comando.CommandTimeout =
+                120;
+
+            comando.Parameters
+                .Add("@Anio", SqlDbType.Int)
+                .Value = anio;
+
+            await using var reader =
+                await comando.ExecuteReaderAsync(ct);
+
+            while (await reader.ReadAsync(ct))
+            {
+                resultado.Add(
+                    new IngresoMensual
+                    {
+                        Anio =
+                            LeerEntero(
+                                reader,
+                                "Anio"),
+
+                        IdMes =
+                            LeerEntero(
+                                reader,
+                                "IdMes"),
+
+                        Total =
+                            LeerDecimal(
+                                reader,
+                                "Total"),
+
+                        Mes =
+                            string.Empty
+                    });
+            }
+
+            return resultado;
+        }
+
+
+        private static void AgregarParametroEnteroOpcional(
+            SqlCommand comando,
+            string nombre,
+            int? valor)
+        {
+            var parametro =
+                comando.Parameters.Add(
+                    nombre,
+                    SqlDbType.Int);
+
+            parametro.Value =
+                valor.HasValue
+                    ? valor.Value
+                    : DBNull.Value;
+        }
+
+
+        private static string LeerTexto(
+            SqlDataReader reader,
+            string columna)
+        {
+            var valor =
+                reader[columna];
+
+            return valor == DBNull.Value
+                ? string.Empty
+                : Convert.ToString(
+                    valor,
+                    CultureInfo.InvariantCulture)
+                  ?? string.Empty;
+        }
+
+
+        private static int LeerEntero(
+            SqlDataReader reader,
+            string columna)
+        {
+            var valor =
+                reader[columna];
+
+            return valor == DBNull.Value
+                ? 0
+                : Convert.ToInt32(
+                    valor,
+                    CultureInfo.InvariantCulture);
+        }
+
+
+        private static int? LeerEnteroNullable(
+            SqlDataReader reader,
+            string columna)
+        {
+            var valor =
+                reader[columna];
+
+            return valor == DBNull.Value
+                ? null
+                : Convert.ToInt32(
+                    valor,
+                    CultureInfo.InvariantCulture);
+        }
+
+
+        private static decimal LeerDecimal(
+            SqlDataReader reader,
+            string columna)
+        {
+            var valor =
+                reader[columna];
+
+            return valor == DBNull.Value
+                ? 0m
+                : Convert.ToDecimal(
+                    valor,
+                    CultureInfo.InvariantCulture);
+        }
+
+
+        private static DateTime LeerFecha(
+            SqlDataReader reader,
+            string columna)
+        {
+            var valor =
+                reader[columna];
+
+            return valor == DBNull.Value
+                ? DateTime.MinValue
+                : Convert.ToDateTime(
+                    valor,
+                    CultureInfo.InvariantCulture);
+        }
+
+
+        private static DateTime? LeerFechaNullable(
+            SqlDataReader reader,
+            string columna)
+        {
+            var valor =
+                reader[columna];
+
+            return valor == DBNull.Value
+                ? null
+                : Convert.ToDateTime(
+                    valor,
+                    CultureInfo.InvariantCulture);
+        }
+
+
+        private static string FormatearNombreMes(
+            string nombreMes)
+        {
+            if (string.IsNullOrWhiteSpace(nombreMes))
+            {
+                return string.Empty;
+            }
+
+            var cultura =
+                CultureInfo.GetCultureInfo("es-NI");
+
+            nombreMes =
+                nombreMes.Trim().ToLower(cultura);
+
+            return cultura.TextInfo
+                .ToTitleCase(nombreMes);
+        }
     }
 }

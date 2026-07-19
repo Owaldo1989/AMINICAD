@@ -1,101 +1,120 @@
 ﻿@page
 @model AMINICAD.Pages.IndexModel
 
+@using System.Globalization
+@using System.Text.Json
+
 @{
     ViewData["Title"] = "Dashboard";
 
-    var cultura =
-        System.Globalization.CultureInfo.GetCultureInfo("es-NI");
+    var cultura = CultureInfo.GetCultureInfo("es-NI");
 
-    var movimientos =
-        Model.SerieMensual
-            .Where(x => x.Total > 0)
-            .ToList();
+    var resumen = Model.Dashboard.Resumen;
+    var calidad = Model.Dashboard.Calidad;
 
-    var mesesConMovimiento = movimientos.Count;
+    var mensual = Model.Dashboard.Mensual
+        .OrderBy(x => x.Periodo)
+        .ToList();
 
-    var promedioMensual =
-        mesesConMovimiento > 0
-            ? movimientos.Average(x => x.Total)
-            : 0;
+    var distribucion = Model.Dashboard.Distribucion
+        .Where(x => x.Monto > 0)
+        .OrderByDescending(x => x.Monto)
+        .Take(8)
+        .ToList();
 
-    var mejorMes =
-        movimientos
-            .OrderByDescending(x => x.Total)
-            .FirstOrDefault();
+    var regiones = Model.Dashboard.Regiones
+        .Where(x => x.TotalRecaudado > 0)
+        .OrderByDescending(x => x.TotalRecaudado)
+        .Take(10)
+        .ToList();
 
-    var mesesOrdenados =
-        movimientos
-            .OrderByDescending(x => x.Total)
-            .Take(6)
-            .ToList();
+    var distritos = Model.Dashboard.Distritos
+        .Where(x => x.TotalRecaudado > 0)
+        .OrderByDescending(x => x.TotalRecaudado)
+        .Take(8)
+        .ToList();
 
-    var montoMayorMes =
-        mesesOrdenados.Count > 0
-            ? mesesOrdenados.Max(x => x.Total)
-            : 0;
+    var misioneros = Model.Dashboard.Misioneros
+        .Where(x => x.TotalBruto > 0)
+        .OrderByDescending(x => x.TotalBruto)
+        .Take(8)
+        .ToList();
 
-    var totalAnioActual =
-        Model.SerieComparativo4Anios
-            .Where(x => x.Anio == Model.AnioSeleccionado)
-            .Sum(x => x.Total);
+    var iglesias = Model.Dashboard.Iglesias
+        .Where(x => x.TotalAportado > 0)
+        .OrderByDescending(x => x.TotalAportado)
+        .Take(8)
+        .ToList();
 
-    var totalAnioAnterior =
-        Model.SerieComparativo4Anios
-            .Where(x => x.Anio == Model.AnioSeleccionado - 1)
-            .Sum(x => x.Total);
+    var mesesConMovimiento = mensual.Count(x => x.TotalBruto > 0);
 
-    var variacionAnual =
-        totalAnioAnterior > 0
-            ? ((totalAnioActual - totalAnioAnterior)
-                / totalAnioAnterior) * 100
-            : 0;
+    var mejorMes = mensual
+        .Where(x => x.TotalBruto > 0)
+        .OrderByDescending(x => x.TotalBruto)
+        .FirstOrDefault();
 
-    var variacionPositiva =
-        variacionAnual >= 0;
+    var totalIncidencias =
+        calidad.RecibosSinIglesia +
+        calidad.RecibosSinMisionero +
+        calidad.RecibosSinRegion +
+        calidad.RecibosSinDistrito +
+        calidad.FilasSinConcepto +
+        calidad.ConceptosNoClasificados +
+        calidad.RecibosDescuadrados;
 
-    var mesActualNombre =
-        cultura.DateTimeFormat
-            .GetMonthName(Model.MesActual);
+    string FormatearDinero(decimal valor)
+    {
+        return $"C$ {valor.ToString("N2", cultura)}";
+    }
 
-    mesActualNombre =
-        string.IsNullOrWhiteSpace(mesActualNombre)
-            ? Model.MesActual.ToString()
-            : char.ToUpper(mesActualNombre[0], cultura)
-              + mesActualNombre.Substring(1);
-
-    var mejorMesTexto =
-        mejorMes is null
-            ? "Sin datos"
-            : mejorMes.Mes;
+    string FormatearFecha(DateTime? fecha)
+    {
+        return fecha.HasValue
+            ? fecha.Value.ToString("dd/MM/yyyy", cultura)
+            : "Sin fecha";
+    }
 }
 
 <div class="dashboard-container">
 
-    <!-- ENCABEZADO -->
+    <!-- ======================================================
+         ENCABEZADO
+         ====================================================== -->
+
     <div class="page-header">
 
         <div>
-
             <div class="page-pretitle">
                 Resumen ejecutivo
             </div>
 
             <h1 class="page-title">
-                Dashboard financiero
+                Dashboard administrativo
             </h1>
 
             <p class="page-description">
-                Comportamiento de los ingresos y comparación histórica de AMINICAD.
+                Recaudación, distribución de fondos y comportamiento
+                de iglesias, regiones y beneficiarios.
             </p>
-
         </div>
 
         <div class="page-actions">
 
-            <span class="status-chip">
-                Información actualizada
-            </span>
+            <div class="dashboard-period">
+
+                <i class="bi bi-calendar3"></i>
+
+                <div>
+                    <span>Período consultado</span>
+
+                    <strong>
+                        01/01/@Model.AnioSeleccionado
+                        —
+                        31/12/@Model.AnioSeleccionado
+                    </strong>
+                </div>
+
+            </div>
 
             <form method="get"
                   class="filter-card">
@@ -109,13 +128,13 @@
                         class="form-select"
                         onchange="this.form.submit()">
 
-                    @foreach (var y in Model.OpcionesAnio)
+                    @foreach (var anio in Model.OpcionesAnio)
                     {
-                        <option value="@y"
-                                selected="@(y == Model.AnioSeleccionado
+                        <option value="@anio"
+                                selected="@(anio == Model.AnioSeleccionado
                                                                     ? "selected"
                                                                     : null)">
-                            @y
+                            @anio
                         </option>
                     }
 
@@ -128,47 +147,16 @@
     </div>
 
 
-    <!-- INDICADORES -->
+    <!-- ======================================================
+         KPI PRINCIPALES
+         ====================================================== -->
+
     <div class="row g-3 mb-3">
 
-        <div class="col-12 col-sm-6 col-xl-3">
+        <div class="col-12 col-sm-6 col-xl-4 col-xxl-2">
 
             <article class="kpi-card"
                      style="--kpi-accent:#1f2758; --kpi-soft:#eef0f8;">
-
-                <div class="kpi-card-body">
-
-                    <div class="kpi-icon">
-                        <i class="bi bi-calendar2-week"></i>
-                    </div>
-
-                    <div class="kpi-content">
-
-                        <div class="kpi-label">
-                            Ingresos de @mesActualNombre
-                        </div>
-
-                        <div class="kpi-value">
-                            C$ @Model.Kpis.TotalMes.ToString("N2")
-                        </div>
-
-                        <div class="kpi-note">
-                            Período @Model.MesActual/@Model.AnioSeleccionado
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </article>
-
-        </div>
-
-
-        <div class="col-12 col-sm-6 col-xl-3">
-
-            <article class="kpi-card"
-                     style="--kpi-accent:#d8292f; --kpi-soft:#fdeced;">
 
                 <div class="kpi-card-body">
 
@@ -179,33 +167,17 @@
                     <div class="kpi-content">
 
                         <div class="kpi-label">
-                            Acumulado del año
+                            Recaudación bruta
                         </div>
 
-                        <div class="kpi-value">
-                            C$ @Model.Kpis.TotalAnio.ToString("N2")
+                        <div class="kpi-value kpi-value-responsive">
+                            @FormatearDinero(resumen.TotalBruto)
                         </div>
 
-                        @if (totalAnioAnterior > 0)
-                        {
-                            <div class="kpi-note @(variacionPositiva ? "positive" : "negative")">
-
-                                <i class="bi @(variacionPositiva
-                                                                       ? "bi-arrow-up-right"
-                                                                       : "bi-arrow-down-right")">
-                                </i>
-
-                                @Math.Abs(variacionAnual).ToString("N1")%
-                                frente a @(Model.AnioSeleccionado - 1)
-
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="kpi-note">
-                                Sin comparación disponible
-                            </div>
-                        }
+                        <div class="kpi-note">
+                            @resumen.CantidadRecibos.ToString("N0", cultura)
+                            recibos registrados
+                        </div>
 
                     </div>
 
@@ -216,7 +188,7 @@
         </div>
 
 
-        <div class="col-12 col-sm-6 col-xl-3">
+        <div class="col-12 col-sm-6 col-xl-4 col-xxl-2">
 
             <article class="kpi-card"
                      style="--kpi-accent:#16803c; --kpi-soft:#eaf7ef;">
@@ -224,23 +196,22 @@
                 <div class="kpi-card-body">
 
                     <div class="kpi-icon">
-                        <i class="bi bi-graph-up-arrow"></i>
+                        <i class="bi bi-person-check"></i>
                     </div>
 
                     <div class="kpi-content">
 
                         <div class="kpi-label">
-                            Promedio mensual
+                            Neto beneficiarios
                         </div>
 
-                        <div class="kpi-value">
-                            C$ @promedioMensual.ToString("N2")
+                        <div class="kpi-value kpi-value-responsive">
+                            @FormatearDinero(resumen.NetoBeneficiarios)
                         </div>
 
-                        <div class="kpi-note">
-                            Calculado sobre @mesesConMovimiento
-                            @(mesesConMovimiento == 1 ? "mes" : "meses")
-                            con movimiento
+                        <div class="kpi-note positive">
+                            @resumen.PorcentajeNeto.ToString("N2", cultura)%
+                            de lo recaudado
                         </div>
 
                     </div>
@@ -252,7 +223,111 @@
         </div>
 
 
-        <div class="col-12 col-sm-6 col-xl-3">
+        <div class="col-12 col-sm-6 col-xl-4 col-xxl-2">
+
+            <article class="kpi-card"
+                     style="--kpi-accent:#d8292f; --kpi-soft:#fdeced;">
+
+                <div class="kpi-card-body">
+
+                    <div class="kpi-icon">
+                        <i class="bi bi-pie-chart"></i>
+                    </div>
+
+                    <div class="kpi-content">
+
+                        <div class="kpi-label">
+                            Retenciones
+                        </div>
+
+                        <div class="kpi-value kpi-value-responsive">
+                            @FormatearDinero(resumen.TotalRetenciones)
+                        </div>
+
+                        <div class="kpi-note">
+                            @resumen.PorcentajeRetenciones.ToString("N2", cultura)%
+                            del total
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </article>
+
+        </div>
+
+
+        <div class="col-12 col-sm-6 col-xl-4 col-xxl-2">
+
+            <article class="kpi-card"
+                     style="--kpi-accent:#1769aa; --kpi-soft:#e9f3fb;">
+
+                <div class="kpi-card-body">
+
+                    <div class="kpi-icon">
+                        <i class="bi bi-bank2"></i>
+                    </div>
+
+                    <div class="kpi-content">
+
+                        <div class="kpi-label">
+                            Iglesias / aportantes
+                        </div>
+
+                        <div class="kpi-value">
+                            @resumen.CantidadIglesias.ToString("N0", cultura)
+                        </div>
+
+                        <div class="kpi-note">
+                            @resumen.CantidadDistritos.ToString("N0", cultura)
+                            distritos
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </article>
+
+        </div>
+
+
+        <div class="col-12 col-sm-6 col-xl-4 col-xxl-2">
+
+            <article class="kpi-card"
+                     style="--kpi-accent:#7b3fc6; --kpi-soft:#f2ebfb;">
+
+                <div class="kpi-card-body">
+
+                    <div class="kpi-icon">
+                        <i class="bi bi-person-vcard"></i>
+                    </div>
+
+                    <div class="kpi-content">
+
+                        <div class="kpi-label">
+                            Beneficiarios
+                        </div>
+
+                        <div class="kpi-value">
+                            @resumen.CantidadMisioneros.ToString("N0", cultura)
+                        </div>
+
+                        <div class="kpi-note">
+                            Misioneros y proyectos
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </article>
+
+        </div>
+
+
+        <div class="col-12 col-sm-6 col-xl-4 col-xxl-2">
 
             <article class="kpi-card"
                      style="--kpi-accent:#c76b05; --kpi-soft:#fff4df;">
@@ -260,32 +335,22 @@
                 <div class="kpi-card-body">
 
                     <div class="kpi-icon">
-                        <i class="bi bi-trophy"></i>
+                        <i class="bi bi-calculator"></i>
                     </div>
 
                     <div class="kpi-content">
 
                         <div class="kpi-label">
-                            Mes con mayor ingreso
+                            Promedio por aporte
                         </div>
 
-                        <div class="kpi-value">
-                            @mejorMesTexto
+                        <div class="kpi-value kpi-value-responsive">
+                            @FormatearDinero(resumen.PromedioAporte)
                         </div>
 
                         <div class="kpi-note">
-                            @if (mejorMes is not null)
-                            {
-                                <span>
-                                    C$ @mejorMes.Total.ToString("N2")
-                                </span>
-                            }
-                            else
-                            {
-                                <span>
-                                    No hay movimientos para este año
-                                </span>
-                            }
+                            Mediana:
+                            @FormatearDinero(resumen.MedianaAporte)
                         </div>
 
                     </div>
@@ -299,7 +364,10 @@
     </div>
 
 
-    <!-- GRÁFICA PRINCIPAL + RESUMEN -->
+    <!-- ======================================================
+         COMPORTAMIENTO MENSUAL + DISTRIBUCIÓN
+         ====================================================== -->
+
     <div class="row g-3 mb-3">
 
         <div class="col-12 col-xl-8">
@@ -309,13 +377,33 @@
                 <header class="dashboard-card-header">
 
                     <div class="card-heading">
-                        <h2>Comportamiento mensual</h2>
-                        <p>Ingresos registrados durante @Model.AnioSeleccionado</p>
+
+                        <h2>
+                            Comportamiento mensual
+                        </h2>
+
+                        <p>
+                            Recaudación bruta, neto para beneficiarios
+                            y retenciones
+                        </p>
+
                     </div>
 
-                    <span class="card-badge">
-                        @Model.AnioSeleccionado
-                    </span>
+                    <div class="card-header-meta">
+
+                        <span class="card-badge">
+                            @mesesConMovimiento meses con movimientos
+                        </span>
+
+                        @if (mejorMes is not null)
+                        {
+                            <span class="card-highlight">
+                                Mejor mes:
+                                <strong>@mejorMes.Mes</strong>
+                            </span>
+                        }
+
+                    </div>
 
                 </header>
 
@@ -323,23 +411,23 @@
 
                     <div class="chart-container chart-large">
 
-                        <canvas id="chartIngresosAnio">
+                        <canvas id="chartComportamientoMensual">
                         </canvas>
 
-                        <div id="noDataIngresos"
-                             class="no-data">
+                        <div id="emptyComportamiento"
+                             class="chart-empty">
 
-                            <div class="no-data-icon">
-                                <i class="bi bi-bar-chart"></i>
+                            <div class="chart-empty-icon">
+                                <i class="bi bi-graph-up"></i>
                             </div>
 
                             <strong>
-                                No hay ingresos registrados
+                                No hay información mensual
                             </strong>
 
                             <span>
-                                No se encontraron movimientos para
-                                @Model.AnioSeleccionado.
+                                El procedimiento no devolvió movimientos
+                                para @Model.AnioSeleccionado.
                             </span>
 
                         </div>
@@ -360,121 +448,91 @@
                 <header class="dashboard-card-header">
 
                     <div class="card-heading">
-                        <h2>Resumen del período</h2>
-                        <p>Indicadores calculados con los datos disponibles</p>
+
+                        <h2>
+                            Distribución de los fondos
+                        </h2>
+
+                        <p>
+                            Conceptos aplicados a los recibos
+                        </p>
+
                     </div>
 
                 </header>
 
                 <div class="dashboard-card-body">
 
-                    <div class="summary-list">
+                    <div class="distribution-chart">
 
-                        <div class="summary-item">
+                        <div class="distribution-canvas">
 
-                            <div class="summary-icon">
-                                <i class="bi bi-calendar-check"></i>
-                            </div>
+                            <canvas id="chartDistribucion">
+                            </canvas>
 
-                            <div class="summary-copy">
-                                <span>Meses con movimiento</span>
+                            <div id="emptyDistribucion"
+                                 class="chart-empty chart-empty-small">
+
                                 <strong>
-                                    @mesesConMovimiento de 12 meses
+                                    Sin distribución
                                 </strong>
-                            </div>
 
-                            <div class="summary-value">
-                                @((mesesConMovimiento / 12m * 100).ToString("N0"))%
                             </div>
 
                         </div>
 
+                        <div class="distribution-total">
 
-                        <div class="summary-item">
+                            <span>
+                                Total distribuido
+                            </span>
 
-                            <div class="summary-icon">
-                                <i class="bi bi-award"></i>
-                            </div>
-
-                            <div class="summary-copy">
-                                <span>Mejor mes</span>
-                                <strong>@mejorMesTexto</strong>
-                            </div>
-
-                            <div class="summary-value">
-                                @(mejorMes is null
-                                    ? "C$ 0.00"
-                                    : $"C$ {mejorMes.Total:N2}")
-                            </div>
+                            <strong>
+                                @FormatearDinero(resumen.TotalDistribuido)
+                            </strong>
 
                         </div>
 
+                    </div>
 
-                        <div class="summary-item">
+                    <div class="distribution-list">
 
-                            <div class="summary-icon">
-                                <i class="bi bi-calculator"></i>
-                            </div>
+                        @foreach (var item in distribucion.Take(6))
+                        {
+                            <div class="distribution-row">
 
-                            <div class="summary-copy">
-                                <span>Promedio mensual</span>
-                                <strong>Meses con ingresos</strong>
-                            </div>
+                                <div class="distribution-row-copy">
 
-                            <div class="summary-value">
-                                C$ @promedioMensual.ToString("N2")
-                            </div>
-
-                        </div>
-
-
-                        <div class="summary-item">
-
-                            <div class="summary-icon">
-                                <i class="bi bi-arrow-left-right"></i>
-                            </div>
-
-                            <div class="summary-copy">
-                                <span>Variación anual</span>
-                                <strong>
-                                    @Model.AnioSeleccionado vs.
-                                    @(Model.AnioSeleccionado - 1)
-                                </strong>
-                            </div>
-
-                            <div class="summary-value">
-                                @if (totalAnioAnterior > 0)
-                                {
-                                    <span>
-                                        @(variacionAnual >= 0 ? "+" : "")
-                                        @variacionAnual.ToString("N1")%
+                                    <span class="distribution-marker">
                                     </span>
-                                }
-                                else
-                                {
-                                    <span>N/D</span>
-                                }
+
+                                    <div>
+                                        <strong>
+                                            @item.Concepto
+                                        </strong>
+
+                                        <span>
+                                            @item.CantidadRecibos.ToString("N0", cultura)
+                                            recibos
+                                        </span>
+                                    </div>
+
+                                </div>
+
+                                <div class="distribution-row-value">
+
+                                    <strong>
+                                        @FormatearDinero(item.Monto)
+                                    </strong>
+
+                                    <span>
+                                        @item.PorcentajeTotal.ToString("N2", cultura)%
+                                    </span>
+
+                                </div>
+
                             </div>
-
-                        </div>
-
-
-                        <div class="summary-item">
-
-                            <div class="summary-icon">
-                                <i class="bi bi-calendar-month"></i>
-                            </div>
-
-                            <div class="summary-copy">
-                                <span>Mes consultado</span>
-                                <strong>@mesActualNombre</strong>
-                            </div>
-
-                            <div class="summary-value">
-                                C$ @Model.Kpis.TotalMes.ToString("N2")
-                            </div>
-
-                        </div>
+                        }
 
                     </div>
 
@@ -487,8 +545,11 @@
     </div>
 
 
-    <!-- COMPARATIVO + MEJORES MESES -->
-    <div class="row g-3">
+    <!-- ======================================================
+         REGIONES + CONTROL DE CALIDAD
+         ====================================================== -->
+
+    <div class="row g-3 mb-3">
 
         <div class="col-12 col-xl-8">
 
@@ -497,41 +558,40 @@
                 <header class="dashboard-card-header">
 
                     <div class="card-heading">
-                        <h2>Comparativo histórico</h2>
+
+                        <h2>
+                            Recaudación por región
+                        </h2>
+
                         <p>
-                            Evolución mensual de los últimos cuatro años
+                            Participación territorial dentro del período
                         </p>
+
                     </div>
 
                     <span class="card-badge">
-                        @(Model.AnioSeleccionado - 3)
-                        —
-                        @Model.AnioSeleccionado
+                        @resumen.CantidadRegiones regiones
                     </span>
 
                 </header>
 
                 <div class="dashboard-card-body">
 
-                    <div class="chart-container">
+                    <div class="chart-container chart-regions">
 
-                        <canvas id="chartComparativo4Anios">
+                        <canvas id="chartRegiones">
                         </canvas>
 
-                        <div id="noDataComparativo"
-                             class="no-data">
+                        <div id="emptyRegiones"
+                             class="chart-empty">
 
-                            <div class="no-data-icon">
-                                <i class="bi bi-graph-up"></i>
+                            <div class="chart-empty-icon">
+                                <i class="bi bi-geo-alt"></i>
                             </div>
 
                             <strong>
-                                No existe información histórica
+                                No hay regiones para mostrar
                             </strong>
-
-                            <span>
-                                No se encontraron datos para los años seleccionados.
-                            </span>
 
                         </div>
 
@@ -551,70 +611,487 @@
                 <header class="dashboard-card-header">
 
                     <div class="card-heading">
-                        <h2>Meses destacados</h2>
-                        <p>Meses con mayor recaudación del año</p>
+
+                        <h2>
+                            Calidad de información
+                        </h2>
+
+                        <p>
+                            Validaciones administrativas del período
+                        </p>
+
                     </div>
 
-                    <span class="card-badge">
-                        Top @mesesOrdenados.Count
-                    </span>
+                    @if (totalIncidencias > 0)
+                    {
+                        <span class="badge-status badge-status-warning">
+                            @totalIncidencias incidencias
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge-status badge-status-success">
+                            Sin incidencias
+                        </span>
+                    }
 
                 </header>
 
                 <div class="dashboard-card-body">
 
-                    @if (mesesOrdenados.Count > 0)
-                    {
-                        <div class="month-list">
+                    <div class="quality-list">
 
-                            @foreach (var mes in mesesOrdenados)
-                            {
-                                var porcentaje =
-                                    montoMayorMes > 0
-                                        ? mes.Total / montoMayorMes * 100
-                                        : 0;
+                        <div class="quality-item">
 
-                                <div class="month-row">
+                            <div class="quality-icon">
+                                <i class="bi bi-bank"></i>
+                            </div>
 
-                                    <div class="month-name">
-                                        @mes.Mes
-                                    </div>
-
-                                    <div class="month-progress">
-
-                                        <div class="month-progress-bar"
-                                             style="width:@porcentaje.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)%">
-                                        </div>
-
-                                    </div>
-
-                                    <div class="month-amount">
-                                        C$ @mes.Total.ToString("N2")
-                                    </div>
-
-                                </div>
-                            }
+                            <div class="quality-copy">
+                                <span>Recibos sin iglesia</span>
+                                <strong>@calidad.RecibosSinIglesia</strong>
+                            </div>
 
                         </div>
+
+
+                        <div class="quality-item">
+
+                            <div class="quality-icon">
+                                <i class="bi bi-person-x"></i>
+                            </div>
+
+                            <div class="quality-copy">
+                                <span>Recibos sin beneficiario</span>
+                                <strong>@calidad.RecibosSinMisionero</strong>
+                            </div>
+
+                        </div>
+
+
+                        <div class="quality-item">
+
+                            <div class="quality-icon">
+                                <i class="bi bi-geo"></i>
+                            </div>
+
+                            <div class="quality-copy">
+                                <span>Recibos sin región</span>
+                                <strong>@calidad.RecibosSinRegion</strong>
+                            </div>
+
+                        </div>
+
+
+                        <div class="quality-item">
+
+                            <div class="quality-icon">
+                                <i class="bi bi-signpost-split"></i>
+                            </div>
+
+                            <div class="quality-copy">
+                                <span>Recibos sin distrito</span>
+                                <strong>@calidad.RecibosSinDistrito</strong>
+                            </div>
+
+                        </div>
+
+
+                        <div class="quality-item">
+
+                            <div class="quality-icon">
+                                <i class="bi bi-tags"></i>
+                            </div>
+
+                            <div class="quality-copy">
+                                <span>Conceptos no clasificados</span>
+                                <strong>@calidad.ConceptosNoClasificados</strong>
+                            </div>
+
+                        </div>
+
+
+                        <div class="quality-item quality-item-important">
+
+                            <div class="quality-icon">
+                                <i class="bi bi-exclamation-triangle"></i>
+                            </div>
+
+                            <div class="quality-copy">
+                                <span>Recibos descuadrados</span>
+                                <strong>@calidad.RecibosDescuadrados</strong>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    @if (calidad.RecibosDescuadrados > 0)
+                    {
+                        <div class="quality-warning">
+
+                            <i class="bi bi-exclamation-circle"></i>
+
+                            <div>
+                                <strong>
+                                    Diferencia encontrada
+                                </strong>
+
+                                <span>
+                                    @FormatearDinero(calidad.DiferenciaTotal)
+                                </span>
+                            </div>
+
+                        </div>
+                    }
+
+                </div>
+
+            </section>
+
+        </div>
+
+    </div>
+
+
+    <!-- ======================================================
+         DISTRITOS
+         ====================================================== -->
+
+    <section class="dashboard-card mb-3">
+
+        <header class="dashboard-card-header">
+
+            <div class="card-heading">
+
+                <h2>
+                    Distritos con mayor recaudación
+                </h2>
+
+                <p>
+                    Principales resultados territoriales
+                </p>
+
+            </div>
+
+            <span class="card-badge">
+                Top @distritos.Count
+            </span>
+
+        </header>
+
+        <div class="dashboard-table-wrapper">
+
+            <table class="table dashboard-table mb-0">
+
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Distrito</th>
+                        <th>Región</th>
+                        <th class="text-end">Recaudado</th>
+                        <th class="text-end">Recibos</th>
+                        <th class="text-end">Iglesias</th>
+                        <th class="text-end">Promedio</th>
+                        <th>Último aporte</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    @if (distritos.Count > 0)
+                    {
+                        var posicionDistrito = 0;
+
+                        foreach (var distrito in distritos)
+                        {
+                            posicionDistrito++;
+
+                            <tr>
+
+                                <td>
+                                    <span class="ranking-position">
+                                        @posicionDistrito
+                                    </span>
+                                </td>
+
+                                <td>
+                                    <div class="entity-name">
+                                        @distrito.Distrito
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <span class="table-subtitle">
+                                        @distrito.Region
+                                    </span>
+                                </td>
+
+                                <td class="text-end table-money">
+                                    @FormatearDinero(distrito.TotalRecaudado)
+                                </td>
+
+                                <td class="text-end">
+                                    @distrito.CantidadRecibos.ToString("N0", cultura)
+                                </td>
+
+                                <td class="text-end">
+                                    @distrito.Iglesias.ToString("N0", cultura)
+                                </td>
+
+                                <td class="text-end">
+                                    @FormatearDinero(distrito.PromedioAporte)
+                                </td>
+
+                                <td>
+                                    @FormatearFecha(distrito.UltimoAporte)
+                                </td>
+
+                            </tr>
+                        }
                     }
                     else
                     {
-                        <div class="no-data show">
+                        <tr>
+                            <td colspan="8"
+                                class="table-empty">
 
-                            <div class="no-data-icon">
-                                <i class="bi bi-calendar-x"></i>
-                            </div>
+                                No hay distritos disponibles
+                                para el período seleccionado.
 
-                            <strong>
-                                No hay meses para mostrar
-                            </strong>
-
-                            <span>
-                                Selecciona un año que tenga movimientos.
-                            </span>
-
-                        </div>
+                            </td>
+                        </tr>
                     }
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+
+    <!-- ======================================================
+         MISIONEROS E IGLESIAS
+         ====================================================== -->
+
+    <div class="row g-3">
+
+        <div class="col-12 col-xxl-6">
+
+            <section class="dashboard-card">
+
+                <header class="dashboard-card-header">
+
+                    <div class="card-heading">
+
+                        <h2>
+                            Principales beneficiarios
+                        </h2>
+
+                        <p>
+                            Misioneros y proyectos con mayor recaudación
+                        </p>
+
+                    </div>
+
+                    <span class="card-badge">
+                        Top @misioneros.Count
+                    </span>
+
+                </header>
+
+                <div class="dashboard-table-wrapper">
+
+                    <table class="table dashboard-table dashboard-table-compact mb-0">
+
+                        <thead>
+                            <tr>
+                                <th>Beneficiario</th>
+                                <th class="text-end">Bruto</th>
+                                <th class="text-end">Neto</th>
+                                <th class="text-end">Retenciones</th>
+                                <th class="text-end">Recibos</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            @if (misioneros.Count > 0)
+                            {
+                                foreach (var misionero in misioneros)
+                                {
+                                    <tr>
+
+                                        <td>
+
+                                            <div class="table-entity">
+
+                                                <div class="entity-avatar entity-avatar-blue">
+                                                    <i class="bi bi-person"></i>
+                                                </div>
+
+                                                <div>
+                                                    <div class="entity-name">
+                                                        @misionero.Misionero
+                                                    </div>
+
+                                                    <span class="table-subtitle">
+                                                        @misionero.Iglesias iglesias
+                                                    </span>
+                                                </div>
+
+                                            </div>
+
+                                        </td>
+
+                                        <td class="text-end table-money">
+                                            @FormatearDinero(misionero.TotalBruto)
+                                        </td>
+
+                                        <td class="text-end table-money-success">
+                                            @FormatearDinero(misionero.Neto)
+                                        </td>
+
+                                        <td class="text-end">
+                                            @FormatearDinero(misionero.Retenciones)
+                                        </td>
+
+                                        <td class="text-end">
+                                            @misionero.CantidadRecibos.ToString("N0", cultura)
+                                        </td>
+
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="5"
+                                        class="table-empty">
+
+                                        No hay beneficiarios disponibles.
+
+                                    </td>
+                                </tr>
+                            }
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        </div>
+
+
+        <div class="col-12 col-xxl-6">
+
+            <section class="dashboard-card">
+
+                <header class="dashboard-card-header">
+
+                    <div class="card-heading">
+
+                        <h2>
+                            Principales iglesias y aportantes
+                        </h2>
+
+                        <p>
+                            Aportantes con mayor participación
+                        </p>
+
+                    </div>
+
+                    <span class="card-badge">
+                        Top @iglesias.Count
+                    </span>
+
+                </header>
+
+                <div class="dashboard-table-wrapper">
+
+                    <table class="table dashboard-table dashboard-table-compact mb-0">
+
+                        <thead>
+                            <tr>
+                                <th>Iglesia / aportante</th>
+                                <th>Distrito</th>
+                                <th class="text-end">Aportado</th>
+                                <th class="text-end">Recibos</th>
+                                <th class="text-end">Beneficiarios</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            @if (iglesias.Count > 0)
+                            {
+                                foreach (var iglesia in iglesias)
+                                {
+                                    <tr>
+
+                                        <td>
+
+                                            <div class="table-entity">
+
+                                                <div class="entity-avatar entity-avatar-red">
+                                                    <i class="bi bi-bank"></i>
+                                                </div>
+
+                                                <div>
+                                                    <div class="entity-name">
+                                                        @iglesia.Iglesia
+                                                    </div>
+
+                                                    <span class="table-subtitle">
+                                                        @iglesia.Region
+                                                    </span>
+                                                </div>
+
+                                            </div>
+
+                                        </td>
+
+                                        <td>
+                                            <span class="table-subtitle">
+                                                @iglesia.Distrito
+                                            </span>
+                                        </td>
+
+                                        <td class="text-end table-money">
+                                            @FormatearDinero(iglesia.TotalAportado)
+                                        </td>
+
+                                        <td class="text-end">
+                                            @iglesia.CantidadRecibos.ToString("N0", cultura)
+                                        </td>
+
+                                        <td class="text-end">
+                                            @iglesia.MisionerosApoyados.ToString("N0", cultura)
+                                        </td>
+
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="5"
+                                        class="table-empty">
+
+                                        No hay iglesias disponibles.
+
+                                    </td>
+                                </tr>
+                            }
+
+                        </tbody>
+
+                    </table>
 
                 </div>
 
@@ -635,7 +1112,37 @@
     <script>
         (function () {
 
-            const currencyFormatter =
+            const mensual =
+                @Html.Raw(JsonSerializer.Serialize(
+                        mensual.Select(x => new
+                        {
+                                x.Mes,
+                                Bruto = x.TotalBruto,
+                                Neto = x.NetoBeneficiarios,
+                                x.Retenciones,
+                                x.CantidadRecibos
+                        })));
+
+            const distribucion =
+                @Html.Raw(JsonSerializer.Serialize(
+                        distribucion.Select(x => new
+                        {
+                                x.Concepto,
+                                x.Monto,
+                                x.PorcentajeTotal
+                        })));
+
+            const regiones =
+                @Html.Raw(JsonSerializer.Serialize(
+                        regiones.Select(x => new
+                        {
+                                x.Region,
+                                x.TotalRecaudado,
+                                x.CantidadRecibos,
+                                x.Iglesias
+                        })));
+
+            const moneyFormatter =
                 new Intl.NumberFormat(
                     "es-NI",
                     {
@@ -651,296 +1158,163 @@
                         maximumFractionDigits: 1
                     });
 
-            const selectedYear =
-                @Model.AnioSeleccionado;
+            const colors = {
+                primary: "#1f2758",
+                primaryLight: "#6470a6",
+                red: "#d8292f",
+                green: "#16803c",
+                orange: "#c76b05",
+                blue: "#1769aa",
+                purple: "#7b3fc6",
+                gray: "#98a2b3",
+                grid: "#e8ebf2",
+                muted: "#667085"
+            };
 
-            const primaryColor =
-                "#1f2758";
-
-            const redColor =
-                "#d8292f";
-
-            const gridColor =
-                "#e8ebf2";
-
-            const mutedColor =
-                "#667085";
+            const distributionColors = [
+                colors.primary,
+                colors.red,
+                colors.green,
+                colors.blue,
+                colors.orange,
+                colors.purple,
+                colors.primaryLight,
+                colors.gray
+            ];
 
             function money(value) {
-                return `C$ ${currencyFormatter.format(value ?? 0)}`;
+                return `C$ ${moneyFormatter.format(value ?? 0)}`;
             }
 
             function compactMoney(value) {
                 return `C$ ${compactFormatter.format(value ?? 0)}`;
             }
 
+            function showEmpty(canvasId, emptyId) {
+
+                const canvas =
+                    document.getElementById(canvasId);
+
+                const empty =
+                    document.getElementById(emptyId);
+
+                if (canvas) {
+                    canvas.style.display = "none";
+                }
+
+                empty?.classList.add("show");
+            }
+
             Chart.defaults.font.family =
                 "Inter, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
 
             Chart.defaults.color =
-                mutedColor;
+                colors.muted;
 
 
             // ==================================================
-            // GRÁFICA DEL AÑO
+            // COMPORTAMIENTO MENSUAL
             // ==================================================
 
-            const labelsAnio =
-                @Html.Raw(
-                        System.Text.Json.JsonSerializer.Serialize(
-                                Model.SerieMensual.Select(x => x.Mes)));
+            const hasMensual =
+                mensual.some(row =>
+                    Number(row.Bruto) > 0 ||
+                    Number(row.Neto) > 0 ||
+                    Number(row.Retenciones) > 0);
 
-            const valuesAnio =
-                @Html.Raw(
-                        System.Text.Json.JsonSerializer.Serialize(
-                                Model.SerieMensual.Select(x => x.Total)));
+            if (!hasMensual) {
 
-            const hasIngresos =
-                valuesAnio.some(value => Number(value) > 0);
+                showEmpty(
+                    "chartComportamientoMensual",
+                    "emptyComportamiento");
 
-            const chartIngresos =
-                document.getElementById("chartIngresosAnio");
+            } else {
 
-            const noDataIngresos =
-                document.getElementById("noDataIngresos");
-
-            if (!hasIngresos) {
-
-                if (chartIngresos) {
-                    chartIngresos.style.display = "none";
-                }
-
-                noDataIngresos?.classList.add("show");
-
-            } else if (chartIngresos) {
+                const canvas =
+                    document.getElementById(
+                        "chartComportamientoMensual");
 
                 const context =
-                    chartIngresos.getContext("2d");
+                    canvas.getContext("2d");
 
                 const gradient =
                     context.createLinearGradient(
                         0,
                         0,
                         0,
-                        330);
+                        360);
 
                 gradient.addColorStop(
                     0,
-                    "rgba(31, 39, 88, 0.20)");
+                    "rgba(31,39,88,0.20)");
 
                 gradient.addColorStop(
                     1,
-                    "rgba(31, 39, 88, 0.01)");
+                    "rgba(31,39,88,0.01)");
 
                 new Chart(
-                    chartIngresos,
+                    canvas,
                     {
                         type: "line",
 
                         data: {
-                            labels: labelsAnio,
+                            labels:
+                                mensual.map(row => row.Mes),
 
-                            datasets: [{
-                                label: "Ingresos",
-                                data: valuesAnio,
-                                borderColor: primaryColor,
-                                backgroundColor: gradient,
-                                borderWidth: 3,
-                                pointRadius: 3,
-                                pointHoverRadius: 6,
-                                pointBackgroundColor: "#ffffff",
-                                pointBorderColor: primaryColor,
-                                pointBorderWidth: 2,
-                                tension: 0.35,
-                                fill: true
-                            }]
+                            datasets: [
+                                {
+                                    label: "Recaudación bruta",
+                                    data:
+                                        mensual.map(row => row.Bruto),
+                                    borderColor:
+                                        colors.primary,
+                                    backgroundColor:
+                                        gradient,
+                                    borderWidth: 3,
+                                    pointRadius: 3,
+                                    pointHoverRadius: 6,
+                                    pointBackgroundColor: "#ffffff",
+                                    pointBorderColor: colors.primary,
+                                    pointBorderWidth: 2,
+                                    tension: 0.34,
+                                    fill: true
+                                },
+                                {
+                                    label: "Neto beneficiarios",
+                                    data:
+                                        mensual.map(row => row.Neto),
+                                    borderColor:
+                                        colors.green,
+                                    backgroundColor:
+                                        "transparent",
+                                    borderWidth: 2,
+                                    pointRadius: 2,
+                                    pointHoverRadius: 5,
+                                    tension: 0.34,
+                                    fill: false
+                                },
+                                {
+                                    label: "Retenciones",
+                                    data:
+                                        mensual.map(row => row.Retenciones),
+                                    borderColor:
+                                        colors.red,
+                                    backgroundColor:
+                                        "transparent",
+                                    borderWidth: 2,
+                                    borderDash: [6, 4],
+                                    pointRadius: 2,
+                                    pointHoverRadius: 5,
+                                    tension: 0.34,
+                                    fill: false
+                                }
+                            ]
                         },
 
                         options: {
                             responsive: true,
                             maintainAspectRatio: false,
-                            interaction: {
-                                mode: "index",
-                                intersect: false
-                            },
 
-                            plugins: {
-                                legend: {
-                                    display: false
-                                },
-
-                                tooltip: {
-                                    backgroundColor: "#151b42",
-                                    padding: 12,
-                                    displayColors: false,
-
-                                    callbacks: {
-                                        label: function (context) {
-                                            return money(context.parsed.y);
-                                        }
-                                    }
-                                }
-                            },
-
-                            scales: {
-                                x: {
-                                    grid: {
-                                        display: false
-                                    },
-
-                                    border: {
-                                        display: false
-                                    },
-
-                                    ticks: {
-                                        color: mutedColor,
-                                        font: {
-                                            size: 11
-                                        }
-                                    }
-                                },
-
-                                y: {
-                                    beginAtZero: true,
-
-                                    grid: {
-                                        color: gridColor,
-                                        drawTicks: false
-                                    },
-
-                                    border: {
-                                        display: false
-                                    },
-
-                                    ticks: {
-                                        padding: 10,
-
-                                        callback: function (value) {
-                                            return compactMoney(value);
-                                        },
-
-                                        font: {
-                                            size: 11
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    });
-            }
-
-
-            // ==================================================
-            // COMPARATIVO DE 4 AÑOS
-            // ==================================================
-
-            const rows =
-                @Html.Raw(
-                        System.Text.Json.JsonSerializer.Serialize(
-                                Model.SerieComparativo4Anios));
-
-            const hasComparativo =
-                rows.some(row => Number(row.Total) > 0);
-
-            const chartComparativo =
-                document.getElementById("chartComparativo4Anios");
-
-            const noDataComparativo =
-                document.getElementById("noDataComparativo");
-
-            if (!hasComparativo) {
-
-                if (chartComparativo) {
-                    chartComparativo.style.display = "none";
-                }
-
-                noDataComparativo?.classList.add("show");
-
-            } else if (chartComparativo) {
-
-                const labelsMes = [
-                    "Ene",
-                    "Feb",
-                    "Mar",
-                    "Abr",
-                    "May",
-                    "Jun",
-                    "Jul",
-                    "Ago",
-                    "Sep",
-                    "Oct",
-                    "Nov",
-                    "Dic"
-                ];
-
-                const years =
-                    [...new Set(
-                        rows.map(row => row.Anio))]
-                        .sort((a, b) => a - b);
-
-                const historicColors = [
-                    "#c4c9d8",
-                    "#9099b5",
-                    redColor,
-                    primaryColor
-                ];
-
-                const datasets =
-                    years.map(function (year, index) {
-
-                        const data =
-                            new Array(12).fill(0);
-
-                        rows
-                            .filter(row => row.Anio === year)
-                            .forEach(function (row) {
-
-                                const position =
-                                    row.IdMes - 1;
-
-                                if (position >= 0 &&
-                                    position < 12) {
-
-                                    data[position] =
-                                        row.Total;
-                                }
-                            });
-
-                        const isCurrentYear =
-                            year === selectedYear;
-
-                        return {
-                            label: year.toString(),
-                            data: data,
-                            borderColor:
-                                historicColors[
-                                    Math.min(
-                                        index,
-                                        historicColors.length - 1)],
-                            backgroundColor: "transparent",
-                            borderWidth:
-                                isCurrentYear ? 3 : 2,
-                            pointRadius:
-                                isCurrentYear ? 3 : 1.5,
-                            pointHoverRadius: 5,
-                            tension: 0.32,
-                            fill: false
-                        };
-                    });
-
-                new Chart(
-                    chartComparativo,
-                    {
-                        type: "line",
-
-                        data: {
-                            labels: labelsMes,
-                            datasets: datasets
-                        },
-
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
                             interaction: {
                                 mode: "index",
                                 intersect: false
@@ -954,9 +1328,9 @@
                                     labels: {
                                         usePointStyle: true,
                                         pointStyle: "circle",
-                                        boxWidth: 7,
-                                        boxHeight: 7,
-                                        padding: 15,
+                                        padding: 18,
+                                        boxWidth: 8,
+                                        boxHeight: 8,
 
                                         font: {
                                             size: 11
@@ -971,6 +1345,18 @@
                                     callbacks: {
                                         label: function (context) {
                                             return `${context.dataset.label}: ${money(context.parsed.y)}`;
+                                        },
+
+                                        afterBody: function (items) {
+
+                                            const index =
+                                                items[0]?.dataIndex;
+
+                                            if (index === undefined) {
+                                                return "";
+                                            }
+
+                                            return `${mensual[index].CantidadRecibos} recibos`;
                                         }
                                     }
                                 }
@@ -984,12 +1370,6 @@
 
                                     border: {
                                         display: false
-                                    },
-
-                                    ticks: {
-                                        font: {
-                                            size: 11
-                                        }
                                     }
                                 },
 
@@ -997,7 +1377,7 @@
                                     beginAtZero: true,
 
                                     grid: {
-                                        color: gridColor,
+                                        color: colors.grid,
                                         drawTicks: false
                                     },
 
@@ -1010,11 +1390,190 @@
 
                                         callback: function (value) {
                                             return compactMoney(value);
-                                        },
-
-                                        font: {
-                                            size: 11
                                         }
+                                    }
+                                }
+                            }
+                        }
+                    });
+            }
+
+
+            // ==================================================
+            // DISTRIBUCIÓN
+            // ==================================================
+
+            const hasDistribucion =
+                distribucion.some(row =>
+                    Number(row.Monto) > 0);
+
+            if (!hasDistribucion) {
+
+                showEmpty(
+                    "chartDistribucion",
+                    "emptyDistribucion");
+
+            } else {
+
+                new Chart(
+                    document.getElementById(
+                        "chartDistribucion"),
+                    {
+                        type: "doughnut",
+
+                        data: {
+                            labels:
+                                distribucion.map(
+                                    row => row.Concepto),
+
+                            datasets: [{
+                                data:
+                                    distribucion.map(
+                                        row => row.Monto),
+
+                                backgroundColor:
+                                    distributionColors,
+
+                                borderColor: "#ffffff",
+                                borderWidth: 3,
+                                hoverOffset: 5
+                            }]
+                        },
+
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            cutout: "70%",
+
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+
+                                tooltip: {
+                                    backgroundColor: "#151b42",
+                                    padding: 12,
+
+                                    callbacks: {
+                                        label: function (context) {
+
+                                            const row =
+                                                distribucion[
+                                                    context.dataIndex];
+
+                                            return `${row.Concepto}: ${money(row.Monto)} (${row.PorcentajeTotal}%)`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+            }
+
+
+            // ==================================================
+            // REGIONES
+            // ==================================================
+
+            const hasRegiones =
+                regiones.some(row =>
+                    Number(row.TotalRecaudado) > 0);
+
+            if (!hasRegiones) {
+
+                showEmpty(
+                    "chartRegiones",
+                    "emptyRegiones");
+
+            } else {
+
+                new Chart(
+                    document.getElementById(
+                        "chartRegiones"),
+                    {
+                        type: "bar",
+
+                        data: {
+                            labels:
+                                regiones.map(
+                                    row => row.Region),
+
+                            datasets: [{
+                                label: "Recaudación",
+                                data:
+                                    regiones.map(
+                                        row => row.TotalRecaudado),
+
+                                backgroundColor:
+                                    regiones.map(
+                                        (_, index) =>
+                                            index === 0
+                                                ? colors.red
+                                                : colors.primary),
+
+                                borderRadius: 6,
+                                borderSkipped: false,
+                                barThickness: 18
+                            }]
+                        },
+
+                        options: {
+                            indexAxis: "y",
+                            responsive: true,
+                            maintainAspectRatio: false,
+
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+
+                                tooltip: {
+                                    backgroundColor: "#151b42",
+                                    padding: 12,
+
+                                    callbacks: {
+                                        label: function (context) {
+
+                                            const row =
+                                                regiones[
+                                                    context.dataIndex];
+
+                                            return [
+                                                `Recaudación: ${money(row.TotalRecaudado)}`,
+                                                `Recibos: ${row.CantidadRecibos}`,
+                                                `Iglesias: ${row.Iglesias}`
+                                            ];
+                                        }
+                                    }
+                                }
+                            },
+
+                            scales: {
+                                x: {
+                                    beginAtZero: true,
+
+                                    grid: {
+                                        color: colors.grid
+                                    },
+
+                                    border: {
+                                        display: false
+                                    },
+
+                                    ticks: {
+                                        callback: function (value) {
+                                            return compactMoney(value);
+                                        }
+                                    }
+                                },
+
+                                y: {
+                                    grid: {
+                                        display: false
+                                    },
+
+                                    border: {
+                                        display: false
                                     }
                                 }
                             }
