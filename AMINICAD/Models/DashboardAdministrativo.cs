@@ -17,8 +17,23 @@
         public List<DashboardIglesia> Iglesias { get; set; } = new();
 
         public DashboardCalidadDatos Calidad { get; set; } = new();
-    }
 
+        public List<DashboardDiario> Diario { get; set; } = new();
+    }
+    public sealed class DashboardDiario
+    {
+        public DateTime Fecha { get; set; }
+
+        public int Dia { get; set; }
+
+        public decimal TotalBruto { get; set; }
+
+        public decimal NetoBeneficiarios { get; set; }
+
+        public decimal Retenciones { get; set; }
+
+        public int CantidadRecibos { get; set; }
+    }
 
     public sealed class DashboardResumen
     {

@@ -2,6 +2,7 @@ using AMINICAD.DAL;
 using AMINICAD.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using System.Globalization;
 
 namespace AMINICAD.Pages
 {
@@ -12,13 +13,20 @@ namespace AMINICAD.Pages
         public IndexModel(
             IDashboardDAL dashboardDAL)
         {
-            _dashboardDAL =
-                dashboardDAL;
+            _dashboardDAL = dashboardDAL;
         }
 
 
         [BindProperty(SupportsGet = true)]
+        public string Modo { get; set; } = "anio";
+
+
+        [BindProperty(SupportsGet = true)]
         public int? Anio { get; set; }
+
+
+        [BindProperty(SupportsGet = true)]
+        public int? Mes { get; set; }
 
 
         [BindProperty(SupportsGet = true)]
@@ -41,27 +49,38 @@ namespace AMINICAD.Pages
         public int? IdTipoMision { get; set; }
 
 
+        public string ModoSeleccionado { get; private set; } = "anio";
+
+        public bool EsVistaMensual { get; private set; }
+
+        public bool EsPeriodoEnCurso { get; private set; }
+
         public int AnioSeleccionado { get; private set; }
 
+        public int MesSeleccionado { get; private set; }
+
         public int MesActual { get; private set; }
+
+        public string NombreMesSeleccionado { get; private set; } =
+            string.Empty;
+
+        public string TituloPeriodo { get; private set; } =
+            string.Empty;
 
         public DateTime FechaInicial { get; private set; }
 
         public DateTime FechaFinal { get; private set; }
 
+        public DateTime FechaFinalProgramada { get; private set; }
 
-        /*
-         * Resultado completo del nuevo procedimiento.
-         */
+
         public DashboardAdministrativo Dashboard { get; private set; } =
             new();
 
 
         /*
-         * Propiedades de compatibilidad.
-         *
-         * Permiten que el Index.cshtml actual continúe funcionando
-         * mientras incorporamos las nuevas secciones.
+         * Se conservan para compatibilidad con otras partes
+         * del proyecto que todavía puedan utilizarlas.
          */
         public DashboardKpis Kpis { get; private set; } =
             new();
@@ -79,40 +98,53 @@ namespace AMINICAD.Pages
         public List<int> OpcionesAnio { get; private set; } =
             new();
 
+        public List<int> OpcionesMes { get; private set; } =
+            Enumerable.Range(1, 12).ToList();
+
 
         public async Task OnGetAsync(
             CancellationToken ct)
         {
+            var hoy = DateTime.Today;
+
+            MesActual = hoy.Month;
+
             AnioSeleccionado =
-                ValidarAnio(Anio);
+                ValidarAnio(Anio, hoy.Year);
 
-            MesActual =
-                DateTime.Today.Month;
+            ModoSeleccionado =
+                NormalizarModo(Modo);
 
-            FechaInicial =
-                new DateTime(
+            EsVistaMensual =
+                ModoSeleccionado == "mes";
+
+            MesSeleccionado =
+                ValidarMes(
+                    Mes,
                     AnioSeleccionado,
-                    1,
-                    1);
+                    hoy);
 
-            FechaFinal =
-                new DateTime(
-                    AnioSeleccionado,
-                    12,
-                    31);
+            NombreMesSeleccionado =
+                ObtenerNombreMes(
+                    MesSeleccionado);
+
+            ConfigurarPeriodo(hoy);
 
             OpcionesAnio =
                 Enumerable
                     .Range(
-                        DateTime.Today.Year - 5,
+                        hoy.Year - 5,
                         6)
                     .Reverse()
                     .ToList();
 
 
             /*
-             * Ejecutamos de forma secuencial para evitar abrir dos
-             * conexiones simultáneas durante períodos de presión en SQL Server.
+             * Una sola consulta alimenta KPI, distribución,
+             * regiones, distritos, beneficiarios e iglesias.
+             *
+             * En vista anual recibe el rango del año.
+             * En vista mensual recibe únicamente el mes elegido.
              */
             Dashboard =
                 await _dashboardDAL.GetDashboardAsync(
@@ -125,17 +157,21 @@ namespace AMINICAD.Pages
                     IdTipoMision,
                     ct);
 
-            SerieComparativo4Anios =
-                await _dashboardDAL
-                    .GetIngresosComparativo4AniosAsync(
-                        AnioSeleccionado,
-                        ct);
-
 
             /*
-             * Convertimos la serie nueva al modelo que ya utiliza
-             * Index.cshtml.
+             * El comparativo de cuatro años solamente se consulta
+             * en modo anual. La vista mensual no lo necesita.
              */
+            if (!EsVistaMensual)
+            {
+                SerieComparativo4Anios =
+                    await _dashboardDAL
+                        .GetIngresosComparativo4AniosAsync(
+                            AnioSeleccionado,
+                            ct);
+            }
+
+
             SerieMensual =
                 Dashboard.Mensual
                     .Select(
@@ -146,13 +182,11 @@ namespace AMINICAD.Pages
                             Mes = x.Mes,
                             Total = x.TotalBruto
                         })
-                    .OrderBy(x => x.IdMes)
+                    .OrderBy(x => x.Anio)
+                    .ThenBy(x => x.IdMes)
                     .ToList();
 
 
-            /*
-             * Alimentamos las tarjetas actuales.
-             */
             Kpis =
                 new DashboardKpis
                 {
@@ -160,27 +194,107 @@ namespace AMINICAD.Pages
                         Dashboard.Resumen.TotalBruto,
 
                     TotalMes =
-                        Dashboard.Mensual
-                            .Where(
-                                x =>
-                                    x.Anio ==
-                                    AnioSeleccionado
-                                    &&
-                                    x.IdMes ==
-                                    MesActual)
-                            .Select(
-                                x => x.TotalBruto)
-                            .FirstOrDefault()
+                        EsVistaMensual
+                            ? Dashboard.Resumen.TotalBruto
+                            : Dashboard.Mensual
+                                .Where(
+                                    x =>
+                                        x.Anio == AnioSeleccionado
+                                        &&
+                                        x.IdMes == MesActual)
+                                .Select(x => x.TotalBruto)
+                                .FirstOrDefault()
                 };
         }
 
 
-        private static int ValidarAnio(
-            int? anio)
+        public string ObtenerNombreMesOpcion(
+            int mes)
         {
-            var anioActual =
-                DateTime.Today.Year;
+            return ObtenerNombreMes(mes);
+        }
 
+
+        public bool MesEsFuturo(
+            int mes)
+        {
+            var hoy = DateTime.Today;
+
+            return AnioSeleccionado == hoy.Year
+                   &&
+                   mes > hoy.Month;
+        }
+
+
+        private void ConfigurarPeriodo(
+            DateTime hoy)
+        {
+            if (EsVistaMensual)
+            {
+                FechaInicial =
+                    new DateTime(
+                        AnioSeleccionado,
+                        MesSeleccionado,
+                        1);
+
+                FechaFinalProgramada =
+                    FechaInicial
+                        .AddMonths(1)
+                        .AddDays(-1);
+
+                TituloPeriodo =
+                    $"Resumen de {NombreMesSeleccionado} {AnioSeleccionado}";
+            }
+            else
+            {
+                FechaInicial =
+                    new DateTime(
+                        AnioSeleccionado,
+                        1,
+                        1);
+
+                FechaFinalProgramada =
+                    new DateTime(
+                        AnioSeleccionado,
+                        12,
+                        31);
+
+                TituloPeriodo =
+                    $"Resumen anual {AnioSeleccionado}";
+            }
+
+            /*
+             * Para el año o mes actual no consultamos fechas futuras.
+             * Así el encabezado y los resultados reflejan el corte real.
+             */
+            FechaFinal =
+                FechaFinalProgramada > hoy
+                &&
+                FechaInicial <= hoy
+                    ? hoy
+                    : FechaFinalProgramada;
+
+            EsPeriodoEnCurso =
+                FechaFinal < FechaFinalProgramada;
+        }
+
+
+        private static string NormalizarModo(
+            string? modo)
+        {
+            return string.Equals(
+                modo,
+                "mes",
+                StringComparison.OrdinalIgnoreCase)
+                    ? "mes"
+                    : "anio";
+        }
+
+
+        private static int ValidarAnio(
+            int? anio,
+            int anioActual)
+        {
             var resultado =
                 anio ?? anioActual;
 
@@ -195,6 +309,45 @@ namespace AMINICAD.Pages
             }
 
             return resultado;
+        }
+
+
+        private static int ValidarMes(
+            int? mes,
+            int anioSeleccionado,
+            DateTime hoy)
+        {
+            var resultado =
+                mes is >= 1 and <= 12
+                    ? mes.Value
+                    : hoy.Month;
+
+            /*
+             * Evita seleccionar meses futuros dentro del año actual.
+             */
+            if (anioSeleccionado == hoy.Year &&
+                resultado > hoy.Month)
+            {
+                return hoy.Month;
+            }
+
+            return resultado;
+        }
+
+
+        private static string ObtenerNombreMes(
+            int mes)
+        {
+            var cultura =
+                CultureInfo.GetCultureInfo("es-NI");
+
+            var nombre =
+                cultura.DateTimeFormat
+                    .GetMonthName(mes);
+
+            return cultura.TextInfo
+                .ToTitleCase(
+                    nombre.ToLower(cultura));
         }
     }
 }

@@ -12,6 +12,18 @@
     var resumen = Model.Dashboard.Resumen;
     var calidad = Model.Dashboard.Calidad;
 
+    var esVistaMensual = Model.EsVistaMensual;
+
+    var etiquetaPeriodo =
+        esVistaMensual
+            ? $"{Model.NombreMesSeleccionado} {Model.AnioSeleccionado}"
+            : Model.AnioSeleccionado.ToString(cultura);
+
+    var textoCorte =
+        Model.EsPeriodoEnCurso
+            ? $"Datos registrados hasta el {Model.FechaFinal:dd/MM/yyyy}"
+            : $"Período cerrado al {Model.FechaFinal:dd/MM/yyyy}";
+
     var mensual = Model.Dashboard.Mensual
         .OrderBy(x => x.Periodo)
         .ToList();
@@ -89,12 +101,13 @@
             </div>
 
             <h1 class="page-title">
-                Dashboard administrativo
+                @Model.TituloPeriodo
             </h1>
 
             <p class="page-description">
-                Recaudación, distribución de fondos y comportamiento
-                de iglesias, regiones y beneficiarios.
+                @(esVistaMensual
+                    ? "Análisis operativo del mes seleccionado: recaudación, distribución, territorios y beneficiarios."
+                    : "Análisis ejecutivo del año: recaudación, distribución, territorios y beneficiarios.")
             </p>
         </div>
 
@@ -108,37 +121,151 @@
                     <span>Período consultado</span>
 
                     <strong>
-                        01/01/@Model.AnioSeleccionado
+                        @Model.FechaInicial.ToString("dd/MM/yyyy")
                         —
-                        31/12/@Model.AnioSeleccionado
+                        @Model.FechaFinal.ToString("dd/MM/yyyy")
                     </strong>
+
+                    <small class="text-muted">
+                        @textoCorte
+                    </small>
                 </div>
 
             </div>
 
             <form method="get"
-                  class="filter-card">
+                  id="periodFilterForm"
+                  class="d-flex flex-wrap align-items-end gap-2 bg-white border rounded-3 p-2 shadow-sm">
 
-                <label for="anio">
-                    Año
-                </label>
+                <input type="hidden"
+                       id="modo"
+                       name="modo"
+                       value="@Model.ModoSeleccionado" />
 
-                <select id="anio"
-                        name="anio"
-                        class="form-select"
-                        onchange="this.form.submit()">
+                @if (Model.IdRegion.HasValue)
+                {
+                    <input type="hidden"
+                           name="idRegion"
+                           value="@Model.IdRegion.Value" />
+                }
 
-                    @foreach (var anio in Model.OpcionesAnio)
-                    {
-                        <option value="@anio"
-                                selected="@(anio == Model.AnioSeleccionado
-                                                                    ? "selected"
-                                                                    : null)">
-                            @anio
-                        </option>
-                    }
+                @if (Model.IdDistrito.HasValue)
+                {
+                    <input type="hidden"
+                           name="idDistrito"
+                           value="@Model.IdDistrito.Value" />
+                }
 
-                </select>
+                @if (Model.IdMisionero.HasValue)
+                {
+                    <input type="hidden"
+                           name="idMisionero"
+                           value="@Model.IdMisionero.Value" />
+                }
+
+                @if (Model.IdIglesia.HasValue)
+                {
+                    <input type="hidden"
+                           name="idIglesia"
+                           value="@Model.IdIglesia.Value" />
+                }
+
+                @if (Model.IdTipoMision.HasValue)
+                {
+                    <input type="hidden"
+                           name="idTipoMision"
+                           value="@Model.IdTipoMision.Value" />
+                }
+
+                <div>
+                    <label class="form-label small text-muted mb-1">
+                        Vista
+                    </label>
+
+                    <div class="btn-group d-flex"
+                         role="group"
+                         aria-label="Tipo de período">
+
+                        <button type="button"
+                                class="btn btn-sm @(esVistaMensual ? "btn-outline-secondary" : "btn-primary")"
+                                data-period-mode="anio">
+
+                            <i class="bi bi-calendar3 me-1"></i>
+                            Anual
+
+                        </button>
+
+                        <button type="button"
+                                class="btn btn-sm @(esVistaMensual ? "btn-primary" : "btn-outline-secondary")"
+                                data-period-mode="mes">
+
+                            <i class="bi bi-calendar2-week me-1"></i>
+                            Mensual
+
+                        </button>
+
+                    </div>
+                </div>
+
+                <div>
+                    <label for="anio"
+                           class="form-label small text-muted mb-1">
+                        Año
+                    </label>
+
+                    <select id="anio"
+                            name="anio"
+                            class="form-select form-select-sm"
+                            onchange="this.form.submit()">
+
+                        @foreach (var anio in Model.OpcionesAnio)
+                        {
+                            <option value="@anio"
+                                    selected="@(anio == Model.AnioSeleccionado
+                                                                            ? "selected"
+                                                                            : null)">
+                                @anio
+                            </option>
+                        }
+
+                    </select>
+                </div>
+
+                @if (esVistaMensual)
+                {
+                    <div>
+                        <label for="mes"
+                               class="form-label small text-muted mb-1">
+                            Mes
+                        </label>
+
+                        <select id="mes"
+                                name="mes"
+                                class="form-select form-select-sm"
+                                onchange="this.form.submit()">
+
+                            @foreach (var mes in Model.OpcionesMes)
+                            {
+                                <option value="@mes"
+                                        disabled="@(Model.MesEsFuturo(mes)
+                                                                                    ? "disabled"
+                                                                                    : null)"
+                                        selected="@(mes == Model.MesSeleccionado
+                                                                                    ? "selected"
+                                                                                    : null)">
+                                    @Model.ObtenerNombreMesOpcion(mes)
+                                </option>
+                            }
+
+                        </select>
+                    </div>
+                }
+                else
+                {
+                    <input type="hidden"
+                           name="mes"
+                           value="@Model.MesSeleccionado" />
+                }
 
             </form>
 
@@ -167,7 +294,9 @@
                     <div class="kpi-content">
 
                         <div class="kpi-label">
-                            Recaudación bruta
+                            @(esVistaMensual
+                                ? $"Recaudación de {Model.NombreMesSeleccionado}"
+                                : "Recaudación del año")
                         </div>
 
                         <div class="kpi-value kpi-value-responsive">
@@ -202,7 +331,9 @@
                     <div class="kpi-content">
 
                         <div class="kpi-label">
-                            Neto beneficiarios
+                            @(esVistaMensual
+                                ? "Neto del mes"
+                                : "Neto beneficiarios")
                         </div>
 
                         <div class="kpi-value kpi-value-responsive">
@@ -237,7 +368,9 @@
                     <div class="kpi-content">
 
                         <div class="kpi-label">
-                            Retenciones
+                            @(esVistaMensual
+                                ? "Retenciones del mes"
+                                : "Retenciones del año")
                         </div>
 
                         <div class="kpi-value kpi-value-responsive">
@@ -281,7 +414,7 @@
 
                         <div class="kpi-note">
                             @resumen.CantidadDistritos.ToString("N0", cultura)
-                            distritos
+                            distritos activos
                         </div>
 
                     </div>
@@ -315,7 +448,9 @@
                         </div>
 
                         <div class="kpi-note">
-                            Misioneros y proyectos
+                            @(esVistaMensual
+                                ? "Apoyados durante el mes"
+                                : "Misioneros y proyectos")
                         </div>
 
                     </div>
@@ -379,28 +514,45 @@
                     <div class="card-heading">
 
                         <h2>
-                            Comportamiento mensual
+                            @(esVistaMensual
+                                ? $"Composición financiera de {Model.NombreMesSeleccionado}"
+                                : "Comportamiento mensual")
                         </h2>
 
                         <p>
-                            Recaudación bruta, neto para beneficiarios
-                            y retenciones
+                            @(esVistaMensual
+                                ? "Comparación del bruto, neto, retenciones y otros conceptos del mes."
+                                : "Recaudación bruta, neto para beneficiarios y retenciones por mes.")
                         </p>
 
                     </div>
 
                     <div class="card-header-meta">
 
-                        <span class="card-badge">
-                            @mesesConMovimiento meses con movimientos
-                        </span>
-
-                        @if (mejorMes is not null)
+                        @if (esVistaMensual)
                         {
-                            <span class="card-highlight">
-                                Mejor mes:
-                                <strong>@mejorMes.Mes</strong>
+                            <span class="card-badge">
+                                @resumen.CantidadRecibos.ToString("N0", cultura)
+                                recibos
                             </span>
+
+                            <span class="card-highlight">
+                                <strong>@textoCorte</strong>
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="card-badge">
+                                @mesesConMovimiento meses con movimientos
+                            </span>
+
+                            @if (mejorMes is not null)
+                            {
+                                <span class="card-highlight">
+                                    Mejor mes:
+                                    <strong>@mejorMes.Mes</strong>
+                                </span>
+                            }
                         }
 
                     </div>
@@ -422,12 +574,12 @@
                             </div>
 
                             <strong>
-                                No hay información mensual
+                                No hay información para el período
                             </strong>
 
                             <span>
                                 El procedimiento no devolvió movimientos
-                                para @Model.AnioSeleccionado.
+                                para @etiquetaPeriodo.
                             </span>
 
                         </div>
@@ -454,7 +606,7 @@
                         </h2>
 
                         <p>
-                            Conceptos aplicados a los recibos
+                            Conceptos aplicados durante @etiquetaPeriodo
                         </p>
 
                     </div>
@@ -564,7 +716,7 @@
                         </h2>
 
                         <p>
-                            Participación territorial dentro del período
+                            Participación territorial durante @etiquetaPeriodo
                         </p>
 
                     </div>
@@ -617,7 +769,7 @@
                         </h2>
 
                         <p>
-                            Validaciones administrativas del período
+                            Validaciones administrativas de @etiquetaPeriodo
                         </p>
 
                     </div>
@@ -769,7 +921,7 @@
                 </h2>
 
                 <p>
-                    Principales resultados territoriales
+                    Principales resultados territoriales de @etiquetaPeriodo
                 </p>
 
             </div>
@@ -891,7 +1043,7 @@
                         </h2>
 
                         <p>
-                            Misioneros y proyectos con mayor recaudación
+                            Misioneros y proyectos con mayor recaudación en @etiquetaPeriodo
                         </p>
 
                     </div>
@@ -1001,7 +1153,7 @@
                         </h2>
 
                         <p>
-                            Aportantes con mayor participación
+                            Aportantes con mayor participación en @etiquetaPeriodo
                         </p>
 
                     </div>
@@ -1112,35 +1264,73 @@
     <script>
         (function () {
 
+            const esVistaMensual =
+                @Model.EsVistaMensual.ToString().ToLowerInvariant();
+
+            const periodForm =
+                document.getElementById("periodFilterForm");
+
+            const modeInput =
+                document.getElementById("modo");
+
+            document
+                .querySelectorAll("[data-period-mode]")
+                .forEach(function (button) {
+
+                    button.addEventListener(
+                        "click",
+                        function () {
+
+                            if (!periodForm || !modeInput) {
+                                return;
+                            }
+
+                            modeInput.value =
+                                button.dataset.periodMode ?? "anio";
+
+                            periodForm.submit();
+                        });
+                });
+
+            const resumenPeriodo =
+                @Html.Raw(JsonSerializer.Serialize(
+                        new
+                        {
+                                Bruto = resumen.TotalBruto,
+                                Neto = resumen.NetoBeneficiarios,
+                                Retenciones = resumen.TotalRetenciones,
+                                Otros = resumen.OtrosConceptos
+                        }));
+
             const mensual =
                 @Html.Raw(JsonSerializer.Serialize(
-                        mensual.Select(x => new
-                        {
-                                x.Mes,
-                                Bruto = x.TotalBruto,
-                                Neto = x.NetoBeneficiarios,
-                                x.Retenciones,
-                                x.CantidadRecibos
-                        })));
+                                mensual.Select(x => new
+                                {
+                                            x.Mes,
+                                            Bruto = x.TotalBruto,
+                                            Neto = x.NetoBeneficiarios,
+                                            x.Retenciones,
+                                            x.CantidadRecibos
+                                })));
 
             const distribucion =
                 @Html.Raw(JsonSerializer.Serialize(
-                        distribucion.Select(x => new
-                        {
-                                x.Concepto,
-                                x.Monto,
-                                x.PorcentajeTotal
-                        })));
+                                distribucion.Select(x => new
+                                {
+                                            x.Concepto,
+                                            x.Monto,
+                                            x.PorcentajeTotal
+                                })));
 
             const regiones =
                 @Html.Raw(JsonSerializer.Serialize(
-                        regiones.Select(x => new
-                        {
-                                x.Region,
-                                x.TotalRecaudado,
-                                x.CantidadRecibos,
-                                x.Iglesias
-                        })));
+                                regiones.Select(x => new
+                                {
+                                            x.Region,
+                                            x.TotalRecaudado,
+                                            x.CantidadRecibos,
+                                            x.Iglesias
+                                })));
 
             const moneyFormatter =
                 new Intl.NumberFormat(
@@ -1213,29 +1403,132 @@
 
 
             // ==================================================
-            // COMPORTAMIENTO MENSUAL
+            // GRÁFICA PRINCIPAL
             // ==================================================
 
-            const hasMensual =
-                mensual.some(row =>
-                    Number(row.Bruto) > 0 ||
-                    Number(row.Neto) > 0 ||
-                    Number(row.Retenciones) > 0);
+            const canvasPrincipal =
+                document.getElementById(
+                    "chartComportamientoMensual");
 
-            if (!hasMensual) {
+            const hasPeriodo =
+                esVistaMensual
+                    ? Number(resumenPeriodo.Bruto) > 0 ||
+                      Number(resumenPeriodo.Neto) > 0 ||
+                      Number(resumenPeriodo.Retenciones) > 0 ||
+                      Number(resumenPeriodo.Otros) > 0
+                    : mensual.some(row =>
+                        Number(row.Bruto) > 0 ||
+                        Number(row.Neto) > 0 ||
+                        Number(row.Retenciones) > 0);
+
+            if (!hasPeriodo) {
 
                 showEmpty(
                     "chartComportamientoMensual",
                     "emptyComportamiento");
 
+            } else if (esVistaMensual) {
+
+                new Chart(
+                    canvasPrincipal,
+                    {
+                        type: "bar",
+
+                        data: {
+                            labels: [
+                                "Recaudación bruta",
+                                "Neto beneficiarios",
+                                "Retenciones",
+                                "Otros conceptos"
+                            ],
+
+                            datasets: [{
+                                label: "Monto",
+                                data: [
+                                    resumenPeriodo.Bruto,
+                                    resumenPeriodo.Neto,
+                                    resumenPeriodo.Retenciones,
+                                    resumenPeriodo.Otros
+                                ],
+                                backgroundColor: [
+                                    colors.primary,
+                                    colors.green,
+                                    colors.red,
+                                    colors.orange
+                                ],
+                                borderRadius: 8,
+                                borderSkipped: false,
+                                maxBarThickness: 62
+                            }]
+                        },
+
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+
+                                tooltip: {
+                                    backgroundColor: "#151b42",
+                                    padding: 12,
+                                    displayColors: false,
+
+                                    callbacks: {
+                                        label: function (context) {
+                                            return money(context.parsed.y);
+                                        }
+                                    }
+                                }
+                            },
+
+                            scales: {
+                                x: {
+                                    grid: {
+                                        display: false
+                                    },
+
+                                    border: {
+                                        display: false
+                                    },
+
+                                    ticks: {
+                                        font: {
+                                            size: 11
+                                        }
+                                    }
+                                },
+
+                                y: {
+                                    beginAtZero: true,
+
+                                    grid: {
+                                        color: colors.grid,
+                                        drawTicks: false
+                                    },
+
+                                    border: {
+                                        display: false
+                                    },
+
+                                    ticks: {
+                                        padding: 10,
+
+                                        callback: function (value) {
+                                            return compactMoney(value);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+
             } else {
 
-                const canvas =
-                    document.getElementById(
-                        "chartComportamientoMensual");
-
                 const context =
-                    canvas.getContext("2d");
+                    canvasPrincipal.getContext("2d");
 
                 const gradient =
                     context.createLinearGradient(
@@ -1253,7 +1546,7 @@
                     "rgba(31,39,88,0.01)");
 
                 new Chart(
-                    canvas,
+                    canvasPrincipal,
                     {
                         type: "line",
 
