@@ -19,7 +19,72 @@
         public DashboardCalidadDatos Calidad { get; set; } = new();
 
         public List<DashboardDiario> Diario { get; set; } = new();
+
+        public List<DashboardIngresoSalidaMensual> IngresosVsSalidas { get; set; }
+            = new();
+
+        public List<DashboardDistribucionSalida> DistribucionSalidas { get; set; }
+            = new();
+
+        public List<DashboardBeneficiarioFondos> PrincipalesBeneficiarios { get; set; }
+            = new();
     }
+
+    public sealed class DashboardIngresoSalidaMensual
+    {
+        public DateTime Periodo { get; set; }
+
+        public int Anio { get; set; }
+
+        public int IdMes { get; set; }
+
+        public string Mes { get; set; } = string.Empty;
+
+        public decimal Ingresos { get; set; }
+
+        public decimal Salidas { get; set; }
+
+        public decimal Diferencia { get; set; }
+
+        public decimal PorcentajeEntregado { get; set; }
+
+        public int CantidadPlanillas { get; set; }
+
+        public int BeneficiariosPagados { get; set; }
+    }
+
+    public sealed class DashboardDistribucionSalida
+    {
+        public int? IdTipoMision { get; set; }
+
+        public string TipoMision { get; set; } = string.Empty;
+
+        public decimal MontoEntregado { get; set; }
+
+        public decimal PorcentajeTotal { get; set; }
+
+        public int CantidadPlanillas { get; set; }
+
+        public int CantidadBeneficiarios { get; set; }
+    }
+
+    public sealed class DashboardBeneficiarioFondos
+    {
+        public int? IdMisionero { get; set; }
+
+        public string Misionero { get; set; } = string.Empty;
+
+        public int? IdTipoMision { get; set; }
+
+        public string TipoMision { get; set; } = string.Empty;
+
+        public decimal MontoEntregado { get; set; }
+
+        public int CantidadPlanillas { get; set; }
+
+        public DateTime? UltimaEntrega { get; set; }
+    }
+
     public sealed class DashboardDiario
     {
         public DateTime Fecha { get; set; }

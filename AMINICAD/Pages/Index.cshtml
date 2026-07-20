@@ -8,10 +8,8 @@
     ViewData["Title"] = "Dashboard";
 
     var cultura = CultureInfo.GetCultureInfo("es-NI");
-
     var resumen = Model.Dashboard.Resumen;
     var calidad = Model.Dashboard.Calidad;
-
     var esVistaMensual = Model.EsVistaMensual;
 
     var etiquetaPeriodo =
@@ -27,6 +25,46 @@
     var mensual = Model.Dashboard.Mensual
         .OrderBy(x => x.Periodo)
         .ToList();
+
+    var diario = Model.Dashboard.Diario
+        .OrderBy(x => x.Fecha)
+        .ToList();
+
+    var ingresosVsSalidas = Model.IngresosVsSalidas
+        .OrderBy(x => x.Periodo)
+        .ToList();
+
+    var distribucionSalidas = Model.Dashboard.DistribucionSalidas
+        .Where(x => x.MontoEntregado > 0)
+        .OrderByDescending(x => x.MontoEntregado)
+        .ToList();
+
+    var principalesBeneficiarios = Model.Dashboard.PrincipalesBeneficiarios
+        .Where(x => x.MontoEntregado > 0)
+        .OrderByDescending(x => x.MontoEntregado)
+        .Take(10)
+        .ToList();
+
+    var mostrarComparacionFlujo =
+        !esVistaMensual
+        && Model.ComparacionIngresosSalidasDisponible;
+
+    var totalFondosEntregados =
+        ingresosVsSalidas.Sum(x => x.Salidas);
+
+    var cantidadPlanillasPeriodo =
+        ingresosVsSalidas.Sum(x => x.CantidadPlanillas);
+
+    var cantidadBeneficiariosPagados =
+        distribucionSalidas.Sum(x => x.CantidadBeneficiarios);
+
+    var promedioNetoRecibido =
+        cantidadBeneficiariosPagados > 0
+            ? totalFondosEntregados / cantidadBeneficiariosPagados
+            : 0m;
+
+    var mesesConFlujo =
+        ingresosVsSalidas.Count(x => x.Ingresos > 0 || x.Salidas > 0);
 
     var distribucion = Model.Dashboard.Distribucion
         .Where(x => x.Monto > 0)
@@ -58,9 +96,18 @@
         .Take(8)
         .ToList();
 
-    var mesesConMovimiento = mensual.Count(x => x.TotalBruto > 0);
+    var mesesConMovimiento =
+        mensual.Count(x => x.TotalBruto > 0);
+
+    var diasConMovimiento =
+        diario.Count(x => x.TotalBruto > 0);
 
     var mejorMes = mensual
+        .Where(x => x.TotalBruto > 0)
+        .OrderByDescending(x => x.TotalBruto)
+        .FirstOrDefault();
+
+    var mejorDia = diario
         .Where(x => x.TotalBruto > 0)
         .OrderByDescending(x => x.TotalBruto)
         .FirstOrDefault();
@@ -89,10 +136,7 @@
 
 <div class="dashboard-container">
 
-    <!-- ======================================================
-         ENCABEZADO
-         ====================================================== -->
-
+    <!-- ENCABEZADO -->
     <div class="page-header">
 
         <div>
@@ -114,7 +158,6 @@
         <div class="page-actions">
 
             <div class="dashboard-period">
-
                 <i class="bi bi-calendar3"></i>
 
                 <div>
@@ -130,7 +173,6 @@
                         @textoCorte
                     </small>
                 </div>
-
             </div>
 
             <form method="get"
@@ -189,21 +231,16 @@
                         <button type="button"
                                 class="btn btn-sm @(esVistaMensual ? "btn-outline-secondary" : "btn-primary")"
                                 data-period-mode="anio">
-
                             <i class="bi bi-calendar3 me-1"></i>
                             Anual
-
                         </button>
 
                         <button type="button"
                                 class="btn btn-sm @(esVistaMensual ? "btn-primary" : "btn-outline-secondary")"
                                 data-period-mode="mes">
-
                             <i class="bi bi-calendar2-week me-1"></i>
                             Mensual
-
                         </button>
-
                     </div>
                 </div>
 
@@ -221,13 +258,10 @@
                         @foreach (var anio in Model.OpcionesAnio)
                         {
                             <option value="@anio"
-                                    selected="@(anio == Model.AnioSeleccionado
-                                                                            ? "selected"
-                                                                            : null)">
+                                    selected="@(anio == Model.AnioSeleccionado ? "selected" : null)">
                                 @anio
                             </option>
                         }
-
                     </select>
                 </div>
 
@@ -247,16 +281,11 @@
                             @foreach (var mes in Model.OpcionesMes)
                             {
                                 <option value="@mes"
-                                        disabled="@(Model.MesEsFuturo(mes)
-                                                                                    ? "disabled"
-                                                                                    : null)"
-                                        selected="@(mes == Model.MesSeleccionado
-                                                                                    ? "selected"
-                                                                                    : null)">
+                                        disabled="@(Model.MesEsFuturo(mes) ? "disabled" : null)"
+                                        selected="@(mes == Model.MesSeleccionado ? "selected" : null)">
                                     @Model.ObtenerNombreMesOpcion(mes)
                                 </option>
                             }
-
                         </select>
                     </div>
                 }
@@ -266,37 +295,27 @@
                            name="mes"
                            value="@Model.MesSeleccionado" />
                 }
-
             </form>
-
         </div>
-
     </div>
 
 
-    <!-- ======================================================
-         KPI PRINCIPALES
-         ====================================================== -->
-
+    <!-- KPI PRINCIPALES -->
     <div class="row g-3 mb-3">
 
-        <div class="col-12 col-sm-6 col-xl-4 col-xxl-2">
-
+        <div class="col-12 col-sm-6 col-xl-3">
             <article class="kpi-card"
                      style="--kpi-accent:#1f2758; --kpi-soft:#eef0f8;">
-
                 <div class="kpi-card-body">
-
                     <div class="kpi-icon">
                         <i class="bi bi-cash-stack"></i>
                     </div>
 
                     <div class="kpi-content">
-
                         <div class="kpi-label">
                             @(esVistaMensual
-                                ? $"Recaudación de {Model.NombreMesSeleccionado}"
-                                : "Recaudación del año")
+                                ? $"Ingresos recaudados en {Model.NombreMesSeleccionado}"
+                                : "Ingresos recaudados")
                         </div>
 
                         <div class="kpi-value kpi-value-responsive">
@@ -304,36 +323,88 @@
                         </div>
 
                         <div class="kpi-note">
+                            Ingreso ·
                             @resumen.CantidadRecibos.ToString("N0", cultura)
                             recibos registrados
                         </div>
-
                     </div>
-
                 </div>
-
             </article>
-
         </div>
 
+        <div class="col-12 col-sm-6 col-xl-3">
+            <article class="kpi-card"
+                     style="--kpi-accent:#c76b05; --kpi-soft:#fff4df;">
+                <div class="kpi-card-body">
+                    <div class="kpi-icon">
+                        <i class="bi bi-cash-coin"></i>
+                    </div>
 
-        <div class="col-12 col-sm-6 col-xl-4 col-xxl-2">
+                    <div class="kpi-content">
+                        <div class="kpi-label">
+                            @(esVistaMensual
+                                ? $"Egresos entregados en {Model.NombreMesSeleccionado}"
+                                : "Egresos entregados")
+                        </div>
 
+                        <div class="kpi-value kpi-value-responsive">
+                            @(Model.ComparacionIngresosSalidasDisponible
+                                ? FormatearDinero(totalFondosEntregados)
+                                : "—")
+                        </div>
+
+                        <div class="kpi-note">
+                            @(Model.ComparacionIngresosSalidasDisponible
+                                ? $"Egreso · {cantidadPlanillasPeriodo.ToString("N0", cultura)} planillas terminadas"
+                                : "No aplica con filtros territoriales")
+                        </div>
+                    </div>
+                </div>
+            </article>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <article class="kpi-card"
+                     style="--kpi-accent:#087f73; --kpi-soft:#e8f7f5;">
+                <div class="kpi-card-body">
+                    <div class="kpi-icon">
+                        <i class="bi bi-wallet2"></i>
+                    </div>
+
+                    <div class="kpi-content">
+                        <div class="kpi-label">
+                            Promedio neto recibido
+                        </div>
+
+                        <div class="kpi-value kpi-value-responsive">
+                            @(Model.ComparacionIngresosSalidasDisponible
+                                ? FormatearDinero(promedioNetoRecibido)
+                                : "—")
+                        </div>
+
+                        <div class="kpi-note">
+                            @(Model.ComparacionIngresosSalidasDisponible
+                                ? $"Egreso promedio · {cantidadBeneficiariosPagados.ToString("N0", cultura)} beneficiarios pagados"
+                                : "No aplica con filtros territoriales")
+                        </div>
+                    </div>
+                </div>
+            </article>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-3">
             <article class="kpi-card"
                      style="--kpi-accent:#16803c; --kpi-soft:#eaf7ef;">
-
                 <div class="kpi-card-body">
-
                     <div class="kpi-icon">
                         <i class="bi bi-person-check"></i>
                     </div>
 
                     <div class="kpi-content">
-
                         <div class="kpi-label">
                             @(esVistaMensual
-                                ? "Neto del mes"
-                                : "Neto beneficiarios")
+                                ? "Neto calculado del mes"
+                                : "Neto calculado de ingresos")
                         </div>
 
                         <div class="kpi-value kpi-value-responsive">
@@ -342,31 +413,22 @@
 
                         <div class="kpi-note positive">
                             @resumen.PorcentajeNeto.ToString("N2", cultura)%
-                            de lo recaudado
+                            de lo recaudado; no representa lo entregado
                         </div>
-
                     </div>
-
                 </div>
-
             </article>
-
         </div>
 
-
-        <div class="col-12 col-sm-6 col-xl-4 col-xxl-2">
-
+        <div class="col-12 col-sm-6 col-xl-3">
             <article class="kpi-card"
                      style="--kpi-accent:#d8292f; --kpi-soft:#fdeced;">
-
                 <div class="kpi-card-body">
-
                     <div class="kpi-icon">
                         <i class="bi bi-pie-chart"></i>
                     </div>
 
                     <div class="kpi-content">
-
                         <div class="kpi-label">
                             @(esVistaMensual
                                 ? "Retenciones del mes"
@@ -381,29 +443,20 @@
                             @resumen.PorcentajeRetenciones.ToString("N2", cultura)%
                             del total
                         </div>
-
                     </div>
-
                 </div>
-
             </article>
-
         </div>
 
-
-        <div class="col-12 col-sm-6 col-xl-4 col-xxl-2">
-
+        <div class="col-12 col-sm-6 col-xl-3">
             <article class="kpi-card"
                      style="--kpi-accent:#1769aa; --kpi-soft:#e9f3fb;">
-
                 <div class="kpi-card-body">
-
                     <div class="kpi-icon">
                         <i class="bi bi-bank2"></i>
                     </div>
 
                     <div class="kpi-content">
-
                         <div class="kpi-label">
                             Iglesias / aportantes
                         </div>
@@ -416,29 +469,20 @@
                             @resumen.CantidadDistritos.ToString("N0", cultura)
                             distritos activos
                         </div>
-
                     </div>
-
                 </div>
-
             </article>
-
         </div>
 
-
-        <div class="col-12 col-sm-6 col-xl-4 col-xxl-2">
-
+        <div class="col-12 col-sm-6 col-xl-3">
             <article class="kpi-card"
                      style="--kpi-accent:#7b3fc6; --kpi-soft:#f2ebfb;">
-
                 <div class="kpi-card-body">
-
                     <div class="kpi-icon">
                         <i class="bi bi-person-vcard"></i>
                     </div>
 
                     <div class="kpi-content">
-
                         <div class="kpi-label">
                             Beneficiarios
                         </div>
@@ -452,29 +496,20 @@
                                 ? "Apoyados durante el mes"
                                 : "Misioneros y proyectos")
                         </div>
-
                     </div>
-
                 </div>
-
             </article>
-
         </div>
 
-
-        <div class="col-12 col-sm-6 col-xl-4 col-xxl-2">
-
+        <div class="col-12 col-sm-6 col-xl-3">
             <article class="kpi-card"
                      style="--kpi-accent:#c76b05; --kpi-soft:#fff4df;">
-
                 <div class="kpi-card-body">
-
                     <div class="kpi-icon">
                         <i class="bi bi-calculator"></i>
                     </div>
 
                     <div class="kpi-content">
-
                         <div class="kpi-label">
                             Promedio por aporte
                         </div>
@@ -487,58 +522,62 @@
                             Mediana:
                             @FormatearDinero(resumen.MedianaAporte)
                         </div>
-
                     </div>
-
                 </div>
-
             </article>
-
         </div>
-
     </div>
 
 
-    <!-- ======================================================
-         COMPORTAMIENTO MENSUAL + DISTRIBUCIÓN
-         ====================================================== -->
-
+    <!-- COMPORTAMIENTO + DISTRIBUCIÓN -->
     <div class="row g-3 mb-3">
 
         <div class="col-12 col-xl-8">
-
             <section class="dashboard-card">
-
                 <header class="dashboard-card-header">
-
                     <div class="card-heading">
-
                         <h2>
-                            @(esVistaMensual
-                                ? $"Composición financiera de {Model.NombreMesSeleccionado}"
-                                : "Comportamiento mensual")
+                            @(mostrarComparacionFlujo
+                                ? "Ingresos recaudados vs. egresos entregados"
+                                : esVistaMensual
+                                    ? $"Recaudación bruta diaria de {Model.NombreMesSeleccionado}"
+                                    : "Recaudación bruta mensual")
                         </h2>
 
                         <p>
-                            @(esVistaMensual
-                                ? "Comparación del bruto, neto, retenciones y otros conceptos del mes."
-                                : "Recaudación bruta, neto para beneficiarios y retenciones por mes.")
+                            @(mostrarComparacionFlujo
+                                ? "Comparación mensual de la recaudación bruta y las salidas por planillas terminadas."
+                                : esVistaMensual
+                                    ? "Total bruto recaudado por día."
+                                    : "Total bruto recaudado por mes.")
                         </p>
-
                     </div>
 
                     <div class="card-header-meta">
-
-                        @if (esVistaMensual)
+                        @if (mostrarComparacionFlujo)
                         {
                             <span class="card-badge">
-                                @resumen.CantidadRecibos.ToString("N0", cultura)
-                                recibos
+                                @mesesConFlujo meses con flujo
                             </span>
 
                             <span class="card-highlight">
-                                <strong>@textoCorte</strong>
+                                Entregado:
+                                <strong>@FormatearDinero(totalFondosEntregados)</strong>
                             </span>
+                        }
+                        else if (esVistaMensual)
+                        {
+                            <span class="card-badge">
+                                @diasConMovimiento días con movimientos
+                            </span>
+
+                            @if (mejorDia is not null)
+                            {
+                                <span class="card-highlight">
+                                    Mejor día:
+                                    <strong>@mejorDia.Dia</strong>
+                                </span>
+                            }
                         }
                         else
                         {
@@ -554,21 +593,16 @@
                                 </span>
                             }
                         }
-
                     </div>
-
                 </header>
 
                 <div class="dashboard-card-body">
-
                     <div class="chart-container chart-large">
-
                         <canvas id="chartComportamientoMensual">
                         </canvas>
 
                         <div id="emptyComportamiento"
                              class="chart-empty">
-
                             <div class="chart-empty-icon">
                                 <i class="bi bi-graph-up"></i>
                             </div>
@@ -578,29 +612,22 @@
                             </strong>
 
                             <span>
-                                El procedimiento no devolvió movimientos
-                                para @etiquetaPeriodo.
+                                @(mostrarComparacionFlujo
+                                    ? $"No existen ingresos ni fondos entregados para {etiquetaPeriodo}."
+                                    : esVistaMensual
+                                        ? $"El noveno resultado del procedimiento no devolvió movimientos diarios para {etiquetaPeriodo}."
+                                        : $"El procedimiento no devolvió movimientos mensuales para {etiquetaPeriodo}.")
                             </span>
-
                         </div>
-
                     </div>
-
                 </div>
-
             </section>
-
         </div>
 
-
         <div class="col-12 col-xl-4">
-
             <section class="dashboard-card">
-
                 <header class="dashboard-card-header">
-
                     <div class="card-heading">
-
                         <h2>
                             Distribución de los fondos
                         </h2>
@@ -608,33 +635,24 @@
                         <p>
                             Conceptos aplicados durante @etiquetaPeriodo
                         </p>
-
                     </div>
-
                 </header>
 
                 <div class="dashboard-card-body">
-
                     <div class="distribution-chart">
-
                         <div class="distribution-canvas">
-
                             <canvas id="chartDistribucion">
                             </canvas>
 
                             <div id="emptyDistribucion"
                                  class="chart-empty chart-empty-small">
-
                                 <strong>
                                     Sin distribución
                                 </strong>
-
                             </div>
-
                         </div>
 
                         <div class="distribution-total">
-
                             <span>
                                 Total distribuido
                             </span>
@@ -642,19 +660,14 @@
                             <strong>
                                 @FormatearDinero(resumen.TotalDistribuido)
                             </strong>
-
                         </div>
-
                     </div>
 
                     <div class="distribution-list">
-
                         @foreach (var item in distribucion.Take(6))
                         {
                             <div class="distribution-row">
-
                                 <div class="distribution-row-copy">
-
                                     <span class="distribution-marker">
                                     </span>
 
@@ -668,11 +681,9 @@
                                             recibos
                                         </span>
                                     </div>
-
                                 </div>
 
                                 <div class="distribution-row-value">
-
                                     <strong>
                                         @FormatearDinero(item.Monto)
                                     </strong>
@@ -680,37 +691,124 @@
                                     <span>
                                         @item.PorcentajeTotal.ToString("N2", cultura)%
                                     </span>
-
                                 </div>
-
                             </div>
                         }
-
                     </div>
-
                 </div>
-
             </section>
-
         </div>
-
     </div>
 
 
-    <!-- ======================================================
-         REGIONES + CONTROL DE CALIDAD
-         ====================================================== -->
+    @if (Model.ComparacionIngresosSalidasDisponible)
+    {
+        <!-- SALIDAS DE FONDOS + BENEFICIARIOS PAGADOS -->
+        <div class="row g-3 mb-3">
 
+            <div class="col-12 col-xl-5">
+                <section class="dashboard-card">
+                    <header class="dashboard-card-header">
+                        <div class="card-heading">
+                            <h2>Distribución de fondos entregados</h2>
+
+                            <p>
+                                Salidas por tipo de misión durante @etiquetaPeriodo
+                            </p>
+                        </div>
+
+                        <span class="card-badge">
+                            @distribucionSalidas.Count categorías
+                        </span>
+                    </header>
+
+                    <div class="dashboard-card-body">
+                        <div class="distribution-chart">
+                            <div class="distribution-canvas">
+                                <canvas id="chartDistribucionSalidas"></canvas>
+
+                                <div id="emptyDistribucionSalidas"
+                                     class="chart-empty chart-empty-small">
+                                    <strong>Sin fondos entregados</strong>
+                                </div>
+                            </div>
+
+                            <div class="distribution-total">
+                                <span>Total entregado</span>
+                                <strong>@FormatearDinero(totalFondosEntregados)</strong>
+                            </div>
+                        </div>
+
+                        <div class="distribution-list">
+                            @foreach (var item in distribucionSalidas.Take(6))
+                            {
+                                <div class="distribution-row">
+                                    <div class="distribution-row-copy">
+                                        <span class="distribution-marker"></span>
+
+                                        <div>
+                                            <strong>@item.TipoMision</strong>
+                                            <span>
+                                                @item.CantidadBeneficiarios beneficiarios ·
+                                                @item.CantidadPlanillas planillas
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div class="distribution-row-value">
+                                        <strong>@FormatearDinero(item.MontoEntregado)</strong>
+                                        <span>@item.PorcentajeTotal.ToString("N2", cultura)%</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-12 col-xl-7">
+                <section class="dashboard-card">
+                    <header class="dashboard-card-header">
+                        <div class="card-heading">
+                            <h2>Principales beneficiarios pagados</h2>
+
+                            <p>
+                                Top 10 por fondos recibidos durante @etiquetaPeriodo
+                            </p>
+                        </div>
+
+                        <span class="card-badge">
+                            @principalesBeneficiarios.Count beneficiarios
+                        </span>
+                    </header>
+
+                    <div class="dashboard-card-body">
+                        <div class="chart-container chart-regions">
+                            <canvas id="chartBeneficiariosFondos"></canvas>
+
+                            <div id="emptyBeneficiariosFondos"
+                                 class="chart-empty">
+                                <div class="chart-empty-icon">
+                                    <i class="bi bi-people"></i>
+                                </div>
+
+                                <strong>No hay beneficiarios pagados</strong>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    }
+
+
+    <!-- REGIONES + CALIDAD -->
     <div class="row g-3 mb-3">
 
         <div class="col-12 col-xl-8">
-
             <section class="dashboard-card">
-
                 <header class="dashboard-card-header">
-
                     <div class="card-heading">
-
                         <h2>
                             Recaudación por región
                         </h2>
@@ -718,25 +816,20 @@
                         <p>
                             Participación territorial durante @etiquetaPeriodo
                         </p>
-
                     </div>
 
                     <span class="card-badge">
                         @resumen.CantidadRegiones regiones
                     </span>
-
                 </header>
 
                 <div class="dashboard-card-body">
-
                     <div class="chart-container chart-regions">
-
                         <canvas id="chartRegiones">
                         </canvas>
 
                         <div id="emptyRegiones"
                              class="chart-empty">
-
                             <div class="chart-empty-icon">
                                 <i class="bi bi-geo-alt"></i>
                             </div>
@@ -744,26 +837,16 @@
                             <strong>
                                 No hay regiones para mostrar
                             </strong>
-
                         </div>
-
                     </div>
-
                 </div>
-
             </section>
-
         </div>
 
-
         <div class="col-12 col-xl-4">
-
             <section class="dashboard-card">
-
                 <header class="dashboard-card-header">
-
                     <div class="card-heading">
-
                         <h2>
                             Calidad de información
                         </h2>
@@ -771,7 +854,6 @@
                         <p>
                             Validaciones administrativas de @etiquetaPeriodo
                         </p>
-
                     </div>
 
                     @if (totalIncidencias > 0)
@@ -786,15 +868,12 @@
                             Sin incidencias
                         </span>
                     }
-
                 </header>
 
                 <div class="dashboard-card-body">
-
                     <div class="quality-list">
 
                         <div class="quality-item">
-
                             <div class="quality-icon">
                                 <i class="bi bi-bank"></i>
                             </div>
@@ -803,12 +882,9 @@
                                 <span>Recibos sin iglesia</span>
                                 <strong>@calidad.RecibosSinIglesia</strong>
                             </div>
-
                         </div>
 
-
                         <div class="quality-item">
-
                             <div class="quality-icon">
                                 <i class="bi bi-person-x"></i>
                             </div>
@@ -817,12 +893,9 @@
                                 <span>Recibos sin beneficiario</span>
                                 <strong>@calidad.RecibosSinMisionero</strong>
                             </div>
-
                         </div>
 
-
                         <div class="quality-item">
-
                             <div class="quality-icon">
                                 <i class="bi bi-geo"></i>
                             </div>
@@ -831,12 +904,9 @@
                                 <span>Recibos sin región</span>
                                 <strong>@calidad.RecibosSinRegion</strong>
                             </div>
-
                         </div>
 
-
                         <div class="quality-item">
-
                             <div class="quality-icon">
                                 <i class="bi bi-signpost-split"></i>
                             </div>
@@ -845,12 +915,9 @@
                                 <span>Recibos sin distrito</span>
                                 <strong>@calidad.RecibosSinDistrito</strong>
                             </div>
-
                         </div>
 
-
                         <div class="quality-item">
-
                             <div class="quality-icon">
                                 <i class="bi bi-tags"></i>
                             </div>
@@ -859,12 +926,9 @@
                                 <span>Conceptos no clasificados</span>
                                 <strong>@calidad.ConceptosNoClasificados</strong>
                             </div>
-
                         </div>
 
-
                         <div class="quality-item quality-item-important">
-
                             <div class="quality-icon">
                                 <i class="bi bi-exclamation-triangle"></i>
                             </div>
@@ -873,15 +937,12 @@
                                 <span>Recibos descuadrados</span>
                                 <strong>@calidad.RecibosDescuadrados</strong>
                             </div>
-
                         </div>
-
                     </div>
 
                     @if (calidad.RecibosDescuadrados > 0)
                     {
                         <div class="quality-warning">
-
                             <i class="bi bi-exclamation-circle"></i>
 
                             <div>
@@ -893,29 +954,18 @@
                                     @FormatearDinero(calidad.DiferenciaTotal)
                                 </span>
                             </div>
-
                         </div>
                     }
-
                 </div>
-
             </section>
-
         </div>
-
     </div>
 
 
-    <!-- ======================================================
-         DISTRITOS
-         ====================================================== -->
-
+    <!-- DISTRITOS -->
     <section class="dashboard-card mb-3">
-
         <header class="dashboard-card-header">
-
             <div class="card-heading">
-
                 <h2>
                     Distritos con mayor recaudación
                 </h2>
@@ -923,19 +973,15 @@
                 <p>
                     Principales resultados territoriales de @etiquetaPeriodo
                 </p>
-
             </div>
 
             <span class="card-badge">
                 Top @distritos.Count
             </span>
-
         </header>
 
         <div class="dashboard-table-wrapper">
-
             <table class="table dashboard-table mb-0">
-
                 <thead>
                     <tr>
                         <th>#</th>
@@ -950,7 +996,6 @@
                 </thead>
 
                 <tbody>
-
                     @if (distritos.Count > 0)
                     {
                         var posicionDistrito = 0;
@@ -960,7 +1005,6 @@
                             posicionDistrito++;
 
                             <tr>
-
                                 <td>
                                     <span class="ranking-position">
                                         @posicionDistrito
@@ -998,7 +1042,6 @@
                                 <td>
                                     @FormatearFecha(distrito.UltimoAporte)
                                 </td>
-
                             </tr>
                         }
                     }
@@ -1007,37 +1050,24 @@
                         <tr>
                             <td colspan="8"
                                 class="table-empty">
-
                                 No hay distritos disponibles
                                 para el período seleccionado.
-
                             </td>
                         </tr>
                     }
-
                 </tbody>
-
             </table>
-
         </div>
-
     </section>
 
 
-    <!-- ======================================================
-         MISIONEROS E IGLESIAS
-         ====================================================== -->
-
+    <!-- MISIONEROS E IGLESIAS -->
     <div class="row g-3">
 
         <div class="col-12 col-xxl-6">
-
             <section class="dashboard-card">
-
                 <header class="dashboard-card-header">
-
                     <div class="card-heading">
-
                         <h2>
                             Principales beneficiarios
                         </h2>
@@ -1045,19 +1075,15 @@
                         <p>
                             Misioneros y proyectos con mayor recaudación en @etiquetaPeriodo
                         </p>
-
                     </div>
 
                     <span class="card-badge">
                         Top @misioneros.Count
                     </span>
-
                 </header>
 
                 <div class="dashboard-table-wrapper">
-
                     <table class="table dashboard-table dashboard-table-compact mb-0">
-
                         <thead>
                             <tr>
                                 <th>Beneficiario</th>
@@ -1069,17 +1095,13 @@
                         </thead>
 
                         <tbody>
-
                             @if (misioneros.Count > 0)
                             {
                                 foreach (var misionero in misioneros)
                                 {
                                     <tr>
-
                                         <td>
-
                                             <div class="table-entity">
-
                                                 <div class="entity-avatar entity-avatar-blue">
                                                     <i class="bi bi-person"></i>
                                                 </div>
@@ -1093,9 +1115,7 @@
                                                         @misionero.Iglesias iglesias
                                                     </span>
                                                 </div>
-
                                             </div>
-
                                         </td>
 
                                         <td class="text-end table-money">
@@ -1113,7 +1133,6 @@
                                         <td class="text-end">
                                             @misionero.CantidadRecibos.ToString("N0", cultura)
                                         </td>
-
                                     </tr>
                                 }
                             }
@@ -1122,32 +1141,20 @@
                                 <tr>
                                     <td colspan="5"
                                         class="table-empty">
-
                                         No hay beneficiarios disponibles.
-
                                     </td>
                                 </tr>
                             }
-
                         </tbody>
-
                     </table>
-
                 </div>
-
             </section>
-
         </div>
 
-
         <div class="col-12 col-xxl-6">
-
             <section class="dashboard-card">
-
                 <header class="dashboard-card-header">
-
                     <div class="card-heading">
-
                         <h2>
                             Principales iglesias y aportantes
                         </h2>
@@ -1155,19 +1162,15 @@
                         <p>
                             Aportantes con mayor participación en @etiquetaPeriodo
                         </p>
-
                     </div>
 
                     <span class="card-badge">
                         Top @iglesias.Count
                     </span>
-
                 </header>
 
                 <div class="dashboard-table-wrapper">
-
                     <table class="table dashboard-table dashboard-table-compact mb-0">
-
                         <thead>
                             <tr>
                                 <th>Iglesia / aportante</th>
@@ -1179,17 +1182,13 @@
                         </thead>
 
                         <tbody>
-
                             @if (iglesias.Count > 0)
                             {
                                 foreach (var iglesia in iglesias)
                                 {
                                     <tr>
-
                                         <td>
-
                                             <div class="table-entity">
-
                                                 <div class="entity-avatar entity-avatar-red">
                                                     <i class="bi bi-bank"></i>
                                                 </div>
@@ -1203,9 +1202,7 @@
                                                         @iglesia.Region
                                                     </span>
                                                 </div>
-
                                             </div>
-
                                         </td>
 
                                         <td>
@@ -1225,7 +1222,6 @@
                                         <td class="text-end">
                                             @iglesia.MisionerosApoyados.ToString("N0", cultura)
                                         </td>
-
                                     </tr>
                                 }
                             }
@@ -1234,25 +1230,21 @@
                                 <tr>
                                     <td colspan="5"
                                         class="table-empty">
-
                                         No hay iglesias disponibles.
-
                                     </td>
                                 </tr>
                             }
-
                         </tbody>
-
                     </table>
-
                 </div>
-
             </section>
-
         </div>
 
-    </div>
 
+
+
+
+    </div>
 </div>
 
 
@@ -1266,6 +1258,9 @@
 
             const esVistaMensual =
                 @Model.EsVistaMensual.ToString().ToLowerInvariant();
+
+            const mostrarComparacionFlujo =
+                @mostrarComparacionFlujo.ToString().ToLowerInvariant();
 
             const periodForm =
                 document.getElementById("periodFilterForm");
@@ -1292,45 +1287,89 @@
                         });
                 });
 
-            const resumenPeriodo =
-                @Html.Raw(JsonSerializer.Serialize(
-                        new
-                        {
-                                Bruto = resumen.TotalBruto,
-                                Neto = resumen.NetoBeneficiarios,
-                                Retenciones = resumen.TotalRetenciones,
-                                Otros = resumen.OtrosConceptos
-                        }));
-
             const mensual =
                 @Html.Raw(JsonSerializer.Serialize(
-                                mensual.Select(x => new
-                                {
-                                            x.Mes,
-                                            Bruto = x.TotalBruto,
-                                            Neto = x.NetoBeneficiarios,
-                                            x.Retenciones,
-                                            x.CantidadRecibos
-                                })));
+                        mensual.Select(x => new
+                        {
+                                Etiqueta = x.Mes,
+                                Bruto = x.TotalBruto,
+                                x.CantidadRecibos
+                        })));
+
+            const diario =
+                @Html.Raw(JsonSerializer.Serialize(
+                        diario.Select(x => new
+                        {
+                                Etiqueta = x.Dia.ToString(cultura),
+                                Fecha = x.Fecha.ToString(
+                                                "yyyy-MM-dd",
+                                        CultureInfo.InvariantCulture),
+                                x.Dia,
+                                Bruto = x.TotalBruto,
+                                x.CantidadRecibos
+                         })));
+
+            const flujoMensual =
+                @Html.Raw(JsonSerializer.Serialize(
+                        ingresosVsSalidas.Select(x => new
+                        {
+                                Etiqueta = x.Mes,
+                                x.Ingresos,
+                                x.Salidas,
+                                x.PorcentajeEntregado,
+                                x.CantidadPlanillas,
+                                x.BeneficiariosPagados
+                        })));
+
+            const distribucionSalidas =
+                @Html.Raw(JsonSerializer.Serialize(
+                        distribucionSalidas.Select(x => new
+                        {
+                                x.TipoMision,
+                                x.MontoEntregado,
+                                x.PorcentajeTotal,
+                                x.CantidadPlanillas,
+                                x.CantidadBeneficiarios
+                        })));
+
+            const beneficiariosFondos =
+                @Html.Raw(JsonSerializer.Serialize(
+                        principalesBeneficiarios.Select(x => new
+                        {
+                                x.Misionero,
+                                x.TipoMision,
+                                x.MontoEntregado,
+                                x.CantidadPlanillas,
+                                UltimaEntrega = x.UltimaEntrega.HasValue
+                                        ? x.UltimaEntrega.Value.ToString(
+                                                "yyyy-MM-dd",
+                                                CultureInfo.InvariantCulture)
+                                        : null
+                        })));
 
             const distribucion =
                 @Html.Raw(JsonSerializer.Serialize(
-                                distribucion.Select(x => new
-                                {
-                                            x.Concepto,
-                                            x.Monto,
-                                            x.PorcentajeTotal
-                                })));
+                        distribucion.Select(x => new
+                        {
+                                x.Concepto,
+                                x.Monto,
+                                x.PorcentajeTotal
+                        })));
 
             const regiones =
                 @Html.Raw(JsonSerializer.Serialize(
-                                regiones.Select(x => new
-                                {
-                                            x.Region,
-                                            x.TotalRecaudado,
-                                            x.CantidadRecibos,
-                                            x.Iglesias
-                                })));
+                        regiones.Select(x => new
+                        {
+                                x.Region,
+                                x.TotalRecaudado,
+                                x.CantidadRecibos,
+                                x.Iglesias
+                        })));
+
+            const seriePrincipal =
+                esVistaMensual
+                    ? diario
+                    : mensual;
 
             const moneyFormatter =
                 new Intl.NumberFormat(
@@ -1346,6 +1385,16 @@
                     {
                         notation: "compact",
                         maximumFractionDigits: 1
+                    });
+
+            const dateFormatter =
+                new Intl.DateTimeFormat(
+                    "es-NI",
+                    {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        timeZone: "UTC"
                     });
 
             const colors = {
@@ -1402,24 +1451,18 @@
                 colors.muted;
 
 
-            // ==================================================
             // GRÁFICA PRINCIPAL
-            // ==================================================
-
             const canvasPrincipal =
                 document.getElementById(
                     "chartComportamientoMensual");
 
             const hasPeriodo =
-                esVistaMensual
-                    ? Number(resumenPeriodo.Bruto) > 0 ||
-                      Number(resumenPeriodo.Neto) > 0 ||
-                      Number(resumenPeriodo.Retenciones) > 0 ||
-                      Number(resumenPeriodo.Otros) > 0
-                    : mensual.some(row =>
-                        Number(row.Bruto) > 0 ||
-                        Number(row.Neto) > 0 ||
-                        Number(row.Retenciones) > 0);
+                mostrarComparacionFlujo
+                    ? flujoMensual.some(row =>
+                        Number(row.Ingresos) > 0 ||
+                        Number(row.Salidas) > 0)
+                    : seriePrincipal.some(row =>
+                        Number(row.Bruto) > 0);
 
             if (!hasPeriodo) {
 
@@ -1427,7 +1470,7 @@
                     "chartComportamientoMensual",
                     "emptyComportamiento");
 
-            } else if (esVistaMensual) {
+            } else {
 
                 new Chart(
                     canvasPrincipal,
@@ -1435,173 +1478,72 @@
                         type: "bar",
 
                         data: {
-                            labels: [
-                                "Recaudación bruta",
-                                "Neto beneficiarios",
-                                "Retenciones",
-                                "Otros conceptos"
-                            ],
-
-                            datasets: [{
-                                label: "Monto",
-                                data: [
-                                    resumenPeriodo.Bruto,
-                                    resumenPeriodo.Neto,
-                                    resumenPeriodo.Retenciones,
-                                    resumenPeriodo.Otros
-                                ],
-                                backgroundColor: [
-                                    colors.primary,
-                                    colors.green,
-                                    colors.red,
-                                    colors.orange
-                                ],
-                                borderRadius: 8,
-                                borderSkipped: false,
-                                maxBarThickness: 62
-                            }]
-                        },
-
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-
-                            plugins: {
-                                legend: {
-                                    display: false
-                                },
-
-                                tooltip: {
-                                    backgroundColor: "#151b42",
-                                    padding: 12,
-                                    displayColors: false,
-
-                                    callbacks: {
-                                        label: function (context) {
-                                            return money(context.parsed.y);
-                                        }
-                                    }
-                                }
-                            },
-
-                            scales: {
-                                x: {
-                                    grid: {
-                                        display: false
-                                    },
-
-                                    border: {
-                                        display: false
-                                    },
-
-                                    ticks: {
-                                        font: {
-                                            size: 11
-                                        }
-                                    }
-                                },
-
-                                y: {
-                                    beginAtZero: true,
-
-                                    grid: {
-                                        color: colors.grid,
-                                        drawTicks: false
-                                    },
-
-                                    border: {
-                                        display: false
-                                    },
-
-                                    ticks: {
-                                        padding: 10,
-
-                                        callback: function (value) {
-                                            return compactMoney(value);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    });
-
-            } else {
-
-                const context =
-                    canvasPrincipal.getContext("2d");
-
-                const gradient =
-                    context.createLinearGradient(
-                        0,
-                        0,
-                        0,
-                        360);
-
-                gradient.addColorStop(
-                    0,
-                    "rgba(31,39,88,0.20)");
-
-                gradient.addColorStop(
-                    1,
-                    "rgba(31,39,88,0.01)");
-
-                new Chart(
-                    canvasPrincipal,
-                    {
-                        type: "line",
-
-                        data: {
                             labels:
-                                mensual.map(row => row.Mes),
+                                mostrarComparacionFlujo
+                                    ? flujoMensual.map(
+                                        row => row.Etiqueta)
+                                    : seriePrincipal.map(
+                                        row => row.Etiqueta),
 
-                            datasets: [
-                                {
+                            datasets:
+                                mostrarComparacionFlujo
+                                    ? [
+                                        {
+                                            label: "Ingresos recaudados",
+                                            data:
+                                                flujoMensual.map(
+                                                    row => row.Ingresos),
+                                            borderColor: colors.primary,
+                                            backgroundColor:
+                                                "rgba(31,39,88,0.86)",
+                                            hoverBackgroundColor:
+                                                colors.primary,
+                                            borderWidth: 1,
+                                            borderRadius: 6,
+                                            borderSkipped: false,
+                                            maxBarThickness: 38,
+                                            categoryPercentage: 0.78,
+                                            barPercentage: 0.84
+                                        },
+                                        {
+                                            label: "Egresos entregados",
+                                            data:
+                                                flujoMensual.map(
+                                                    row => row.Salidas),
+                                            borderColor: colors.green,
+                                            backgroundColor:
+                                                "rgba(22,128,60,0.78)",
+                                            hoverBackgroundColor:
+                                                colors.green,
+                                            borderWidth: 1,
+                                            borderRadius: 6,
+                                            borderSkipped: false,
+                                            maxBarThickness: 38,
+                                            categoryPercentage: 0.78,
+                                            barPercentage: 0.84
+                                        }
+                                    ]
+                                    : [
+                                        {
                                     label: "Recaudación bruta",
                                     data:
-                                        mensual.map(row => row.Bruto),
+                                        seriePrincipal.map(
+                                            row => row.Bruto),
                                     borderColor:
                                         colors.primary,
                                     backgroundColor:
-                                        gradient,
-                                    borderWidth: 3,
-                                    pointRadius: 3,
-                                    pointHoverRadius: 6,
-                                    pointBackgroundColor: "#ffffff",
-                                    pointBorderColor: colors.primary,
-                                    pointBorderWidth: 2,
-                                    tension: 0.34,
-                                    fill: true
-                                },
-                                {
-                                    label: "Neto beneficiarios",
-                                    data:
-                                        mensual.map(row => row.Neto),
-                                    borderColor:
-                                        colors.green,
-                                    backgroundColor:
-                                        "transparent",
-                                    borderWidth: 2,
-                                    pointRadius: 2,
-                                    pointHoverRadius: 5,
-                                    tension: 0.34,
-                                    fill: false
-                                },
-                                {
-                                    label: "Retenciones",
-                                    data:
-                                        mensual.map(row => row.Retenciones),
-                                    borderColor:
-                                        colors.red,
-                                    backgroundColor:
-                                        "transparent",
-                                    borderWidth: 2,
-                                    borderDash: [6, 4],
-                                    pointRadius: 2,
-                                    pointHoverRadius: 5,
-                                    tension: 0.34,
-                                    fill: false
-                                }
-                            ]
+                                        "rgba(31,39,88,0.86)",
+                                    hoverBackgroundColor:
+                                        colors.primary,
+                                    borderWidth: 1,
+                                    borderRadius: 6,
+                                    borderSkipped: false,
+                                    maxBarThickness:
+                                        esVistaMensual ? 28 : 52,
+                                    categoryPercentage: 0.78,
+                                    barPercentage: 0.9
+                                        }
+                                    ]
                         },
 
                         options: {
@@ -1615,19 +1557,16 @@
 
                             plugins: {
                                 legend: {
+                                    display: mostrarComparacionFlujo,
                                     position: "top",
                                     align: "end",
 
                                     labels: {
                                         usePointStyle: true,
-                                        pointStyle: "circle",
-                                        padding: 18,
-                                        boxWidth: 8,
-                                        boxHeight: 8,
-
-                                        font: {
-                                            size: 11
-                                        }
+                                        pointStyle: "rectRounded",
+                                        padding: 16,
+                                        boxWidth: 10,
+                                        boxHeight: 10
                                     }
                                 },
 
@@ -1636,6 +1575,31 @@
                                     padding: 12,
 
                                     callbacks: {
+                                        title: function (items) {
+
+                                            const index =
+                                                items[0]?.dataIndex;
+
+                                            if (index === undefined) {
+                                                return "";
+                                            }
+
+                                            const row =
+                                                mostrarComparacionFlujo
+                                                    ? flujoMensual[index]
+                                                    : seriePrincipal[index];
+
+                                            if (esVistaMensual &&
+                                                row.Fecha) {
+
+                                                return `Día ${row.Dia} · ${dateFormatter.format(
+                                                    new Date(
+                                                        `${row.Fecha}T00:00:00Z`))}`;
+                                            }
+
+                                            return row.Etiqueta;
+                                        },
+
                                         label: function (context) {
                                             return `${context.dataset.label}: ${money(context.parsed.y)}`;
                                         },
@@ -1649,7 +1613,18 @@
                                                 return "";
                                             }
 
-                                            return `${mensual[index].CantidadRecibos} recibos`;
+                                            if (mostrarComparacionFlujo) {
+                                                const row =
+                                                    flujoMensual[index];
+
+                                                return [
+                                                    `${row.CantidadPlanillas} planillas`,
+                                                    `${row.BeneficiariosPagados} beneficiarios pagados`,
+                                                    `${row.PorcentajeEntregado}% entregado respecto a ingresos`
+                                                ];
+                                            }
+
+                                            return `${seriePrincipal[index].CantidadRecibos} recibos`;
                                         }
                                     }
                                 }
@@ -1663,6 +1638,13 @@
 
                                     border: {
                                         display: false
+                                    },
+
+                                    ticks: {
+                                        autoSkip: true,
+                                        maxTicksLimit:
+                                            esVistaMensual ? 16 : 12,
+                                        maxRotation: 0
                                     }
                                 },
 
@@ -1692,10 +1674,198 @@
             }
 
 
-            // ==================================================
-            // DISTRIBUCIÓN
-            // ==================================================
+            // DISTRIBUCIÓN DE SALIDAS POR TIPO DE MISIÓN
+            const canvasDistribucionSalidas =
+                document.getElementById(
+                    "chartDistribucionSalidas");
 
+            if (canvasDistribucionSalidas) {
+
+                const hasDistribucionSalidas =
+                    distribucionSalidas.some(row =>
+                        Number(row.MontoEntregado) > 0);
+
+                if (!hasDistribucionSalidas) {
+
+                    showEmpty(
+                        "chartDistribucionSalidas",
+                        "emptyDistribucionSalidas");
+
+                } else {
+
+                    new Chart(
+                        canvasDistribucionSalidas,
+                        {
+                            type: "doughnut",
+
+                            data: {
+                                labels:
+                                    distribucionSalidas.map(
+                                        row => row.TipoMision),
+
+                                datasets: [{
+                                    data:
+                                        distribucionSalidas.map(
+                                            row => row.MontoEntregado),
+                                    backgroundColor:
+                                        distributionColors,
+                                    borderColor: "#ffffff",
+                                    borderWidth: 3,
+                                    hoverOffset: 5
+                                }]
+                            },
+
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                cutout: "68%",
+
+                                plugins: {
+                                    legend: {
+                                        display: false
+                                    },
+
+                                    tooltip: {
+                                        backgroundColor: "#151b42",
+                                        padding: 12,
+
+                                        callbacks: {
+                                            label: function (context) {
+                                                const row =
+                                                    distribucionSalidas[
+                                                        context.dataIndex];
+
+                                                return [
+                                                    `${row.TipoMision}: ${money(row.MontoEntregado)}`,
+                                                    `${row.PorcentajeTotal}% del total`,
+                                                    `${row.CantidadBeneficiarios} beneficiarios`,
+                                                    `${row.CantidadPlanillas} planillas`
+                                                ];
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                }
+            }
+
+
+            // PRINCIPALES BENEFICIARIOS PAGADOS
+            const canvasBeneficiariosFondos =
+                document.getElementById(
+                    "chartBeneficiariosFondos");
+
+            if (canvasBeneficiariosFondos) {
+
+                const hasBeneficiariosFondos =
+                    beneficiariosFondos.some(row =>
+                        Number(row.MontoEntregado) > 0);
+
+                if (!hasBeneficiariosFondos) {
+
+                    showEmpty(
+                        "chartBeneficiariosFondos",
+                        "emptyBeneficiariosFondos");
+
+                } else {
+
+                    new Chart(
+                        canvasBeneficiariosFondos,
+                        {
+                            type: "bar",
+
+                            data: {
+                                labels:
+                                    beneficiariosFondos.map(
+                                        row => row.Misionero),
+
+                                datasets: [{
+                                    label: "Fondos entregados",
+                                    data:
+                                        beneficiariosFondos.map(
+                                            row => row.MontoEntregado),
+                                    backgroundColor:
+                                        beneficiariosFondos.map(
+                                            (_, index) =>
+                                                index === 0
+                                                    ? colors.green
+                                                    : "rgba(31,39,88,0.82)"),
+                                    borderRadius: 6,
+                                    borderSkipped: false,
+                                    maxBarThickness: 22
+                                }]
+                            },
+
+                            options: {
+                                indexAxis: "y",
+                                responsive: true,
+                                maintainAspectRatio: false,
+
+                                plugins: {
+                                    legend: {
+                                        display: false
+                                    },
+
+                                    tooltip: {
+                                        backgroundColor: "#151b42",
+                                        padding: 12,
+
+                                        callbacks: {
+                                            label: function (context) {
+                                                const row =
+                                                    beneficiariosFondos[
+                                                        context.dataIndex];
+
+                                                const ultimaEntrega =
+                                                    row.UltimaEntrega
+                                                        ? dateFormatter.format(
+                                                            new Date(
+                                                                `${row.UltimaEntrega}T00:00:00Z`))
+                                                        : "Sin fecha";
+
+                                                return [
+                                                    `Fondos: ${money(row.MontoEntregado)}`,
+                                                    `Tipo: ${row.TipoMision}`,
+                                                    `Planillas: ${row.CantidadPlanillas}`,
+                                                    `Última entrega: ${ultimaEntrega}`
+                                                ];
+                                            }
+                                        }
+                                    }
+                                },
+
+                                scales: {
+                                    x: {
+                                        beginAtZero: true,
+                                        grid: {
+                                            color: colors.grid
+                                        },
+                                        border: {
+                                            display: false
+                                        },
+                                        ticks: {
+                                            callback: function (value) {
+                                                return compactMoney(value);
+                                            }
+                                        }
+                                    },
+                                    y: {
+                                        grid: {
+                                            display: false
+                                        },
+                                        border: {
+                                            display: false
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                }
+            }
+
+
+            // DISTRIBUCIÓN
             const hasDistribucion =
                 distribucion.some(row =>
                     Number(row.Monto) > 0);
@@ -1764,10 +1934,7 @@
             }
 
 
-            // ==================================================
             // REGIONES
-            // ==================================================
-
             const hasRegiones =
                 regiones.some(row =>
                     Number(row.TotalRecaudado) > 0);

@@ -10,6 +10,7 @@ namespace AMINICAD.Pages
     {
         private readonly IDashboardDAL _dashboardDAL;
 
+
         public IndexModel(
             IDashboardDAL dashboardDAL)
         {
@@ -49,27 +50,53 @@ namespace AMINICAD.Pages
         public int? IdTipoMision { get; set; }
 
 
-        public string ModoSeleccionado { get; private set; } = "anio";
+        public string ModoSeleccionado { get; private set; } =
+            "anio";
+
 
         public bool EsVistaMensual { get; private set; }
 
+
         public bool EsPeriodoEnCurso { get; private set; }
+
+
+        /*
+         * La comparación de ingresos contra salidas solamente
+         * es totalmente consistente cuando no se aplican filtros
+         * de región, distrito o iglesia.
+         *
+         * Las planillas de salida no contienen directamente
+         * esos tres campos.
+         */
+        public bool ComparacionIngresosSalidasDisponible
+        {
+            get;
+            private set;
+        }
+
 
         public int AnioSeleccionado { get; private set; }
 
+
         public int MesSeleccionado { get; private set; }
 
+
         public int MesActual { get; private set; }
+
 
         public string NombreMesSeleccionado { get; private set; } =
             string.Empty;
 
+
         public string TituloPeriodo { get; private set; } =
             string.Empty;
 
+
         public DateTime FechaInicial { get; private set; }
 
+
         public DateTime FechaFinal { get; private set; }
+
 
         public DateTime FechaFinalProgramada { get; private set; }
 
@@ -79,14 +106,29 @@ namespace AMINICAD.Pages
 
 
         /*
+         * Serie mensual utilizada para comparar los ingresos
+         * registrados contra las salidas realizadas mediante
+         * planillas.
+         */
+        public List<DashboardIngresoSalidaMensual>
+            IngresosVsSalidas
+        {
+            get;
+            private set;
+        } = new();
+
+
+        /*
          * Se conservan para compatibilidad con otras partes
          * del proyecto que todavía puedan utilizarlas.
          */
         public DashboardKpis Kpis { get; private set; } =
             new();
 
+
         public List<IngresoMensual> SerieMensual { get; private set; } =
             new();
+
 
         public List<IngresoMensual> SerieComparativo4Anios
         {
@@ -98,8 +140,11 @@ namespace AMINICAD.Pages
         public List<int> OpcionesAnio { get; private set; } =
             new();
 
+
         public List<int> OpcionesMes { get; private set; } =
-            Enumerable.Range(1, 12).ToList();
+            Enumerable
+                .Range(1, 12)
+                .ToList();
 
 
         public async Task OnGetAsync(
@@ -109,14 +154,20 @@ namespace AMINICAD.Pages
 
             MesActual = hoy.Month;
 
+
             AnioSeleccionado =
-                ValidarAnio(Anio, hoy.Year);
+                ValidarAnio(
+                    Anio,
+                    hoy.Year);
+
 
             ModoSeleccionado =
                 NormalizarModo(Modo);
 
+
             EsVistaMensual =
                 ModoSeleccionado == "mes";
+
 
             MesSeleccionado =
                 ValidarMes(
@@ -124,11 +175,30 @@ namespace AMINICAD.Pages
                     AnioSeleccionado,
                     hoy);
 
+
             NombreMesSeleccionado =
                 ObtenerNombreMes(
                     MesSeleccionado);
 
+
             ConfigurarPeriodo(hoy);
+
+
+            /*
+             * Esta comparación se deshabilita cuando se selecciona
+             * región, distrito o iglesia, porque esos filtros existen
+             * en los ingresos, pero no directamente en las planillas.
+             *
+             * Los filtros por misionero y tipo de misión sí pueden
+             * aplicarse tanto a ingresos como a salidas.
+             */
+            ComparacionIngresosSalidasDisponible =
+                !IdRegion.HasValue
+                &&
+                !IdDistrito.HasValue
+                &&
+                !IdIglesia.HasValue;
+
 
             OpcionesAnio =
                 Enumerable
@@ -140,8 +210,18 @@ namespace AMINICAD.Pages
 
 
             /*
-             * Una sola consulta alimenta KPI, distribución,
-             * regiones, distritos, beneficiarios e iglesias.
+             * Una sola consulta alimenta:
+             *
+             * - KPI generales.
+             * - Comportamiento mensual.
+             * - Distribución por concepto.
+             * - Regiones.
+             * - Distritos.
+             * - Beneficiarios.
+             * - Iglesias.
+             * - Control de calidad.
+             * - Comportamiento diario.
+             * - Ingresos contra salidas.
              *
              * En vista anual recibe el rango del año.
              * En vista mensual recibe únicamente el mes elegido.
@@ -156,6 +236,17 @@ namespace AMINICAD.Pages
                     IdIglesia,
                     IdTipoMision,
                     ct);
+
+
+            /*
+             * La colección ya viene ordenada desde el DAL,
+             * pero se vuelve a ordenar para garantizar que
+             * la gráfica respete la secuencia cronológica.
+             */
+            IngresosVsSalidas =
+                Dashboard.IngresosVsSalidas
+                    .OrderBy(x => x.Periodo)
+                    .ToList();
 
 
             /*
@@ -202,7 +293,8 @@ namespace AMINICAD.Pages
                                         x.Anio == AnioSeleccionado
                                         &&
                                         x.IdMes == MesActual)
-                                .Select(x => x.TotalBruto)
+                                .Select(
+                                    x => x.TotalBruto)
                                 .FirstOrDefault()
                 };
         }
@@ -237,13 +329,17 @@ namespace AMINICAD.Pages
                         MesSeleccionado,
                         1);
 
+
                 FechaFinalProgramada =
                     FechaInicial
                         .AddMonths(1)
                         .AddDays(-1);
 
+
                 TituloPeriodo =
-                    $"Resumen de {NombreMesSeleccionado} {AnioSeleccionado}";
+                    $"Resumen de " +
+                    $"{NombreMesSeleccionado} " +
+                    $"{AnioSeleccionado}";
             }
             else
             {
@@ -253,15 +349,18 @@ namespace AMINICAD.Pages
                         1,
                         1);
 
+
                 FechaFinalProgramada =
                     new DateTime(
                         AnioSeleccionado,
                         12,
                         31);
 
+
                 TituloPeriodo =
                     $"Resumen anual {AnioSeleccionado}";
             }
+
 
             /*
              * Para el año o mes actual no consultamos fechas futuras.
@@ -273,6 +372,7 @@ namespace AMINICAD.Pages
                 FechaInicial <= hoy
                     ? hoy
                     : FechaFinalProgramada;
+
 
             EsPeriodoEnCurso =
                 FechaFinal < FechaFinalProgramada;
@@ -298,15 +398,18 @@ namespace AMINICAD.Pages
             var resultado =
                 anio ?? anioActual;
 
+
             if (resultado < 2000)
             {
                 return anioActual;
             }
 
+
             if (resultado > anioActual)
             {
                 return anioActual;
             }
+
 
             return resultado;
         }
@@ -322,14 +425,18 @@ namespace AMINICAD.Pages
                     ? mes.Value
                     : hoy.Month;
 
+
             /*
-             * Evita seleccionar meses futuros dentro del año actual.
+             * Evita seleccionar meses futuros dentro
+             * del año actual.
              */
-            if (anioSeleccionado == hoy.Year &&
+            if (anioSeleccionado == hoy.Year
+                &&
                 resultado > hoy.Month)
             {
                 return hoy.Month;
             }
+
 
             return resultado;
         }
@@ -339,11 +446,14 @@ namespace AMINICAD.Pages
             int mes)
         {
             var cultura =
-                CultureInfo.GetCultureInfo("es-NI");
+                CultureInfo.GetCultureInfo(
+                    "es-NI");
+
 
             var nombre =
                 cultura.DateTimeFormat
                     .GetMonthName(mes);
+
 
             return cultura.TextInfo
                 .ToTitleCase(

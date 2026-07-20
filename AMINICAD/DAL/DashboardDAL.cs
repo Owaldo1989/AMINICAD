@@ -614,6 +614,213 @@ namespace AMINICAD.DAL
                     };
             }
 
+
+            /*
+             * RESULTADO 9:
+             * Comportamiento diario dentro del rango solicitado.
+             *
+             * Columnas esperadas:
+             * Fecha, Dia, TotalBruto, NetoBeneficiarios,
+             * Retenciones y CantidadRecibos.
+             */
+            if (await reader.NextResultAsync(ct))
+            {
+                while (await reader.ReadAsync(ct))
+                {
+                    resultado.Diario.Add(
+                        new DashboardDiario
+                        {
+                            Fecha =
+                                LeerFecha(
+                                    reader,
+                                    "Fecha"),
+
+                            Dia =
+                                LeerEntero(
+                                    reader,
+                                    "Dia"),
+
+                            TotalBruto =
+                                LeerDecimal(
+                                    reader,
+                                    "TotalBruto"),
+
+                            NetoBeneficiarios =
+                                LeerDecimal(
+                                    reader,
+                                    "NetoBeneficiarios"),
+
+                            Retenciones =
+                                LeerDecimal(
+                                    reader,
+                                    "Retenciones"),
+
+                            CantidadRecibos =
+                                LeerEntero(
+                                    reader,
+                                    "CantidadRecibos")
+                        });
+                }
+
+
+
+                /*
+ * RESULTADO 10:
+ * Comparación de ingresos contra salidas por mes.
+ */
+                if (await reader.NextResultAsync(ct))
+                {
+                    while (await reader.ReadAsync(ct))
+                    {
+                        resultado.IngresosVsSalidas.Add(
+                            new DashboardIngresoSalidaMensual
+                            {
+                                Periodo = LeerFecha(
+                                    reader,
+                                    "Periodo"),
+
+                                Anio = LeerEntero(
+                                    reader,
+                                    "Anio"),
+
+                                IdMes = LeerEntero(
+                                    reader,
+                                    "IdMes"),
+
+                                Mes = LeerTexto(
+                                    reader,
+                                    "Mes"),
+
+                                Ingresos = LeerDecimal(
+                                    reader,
+                                    "Ingresos"),
+
+                                Salidas = LeerDecimal(
+                                    reader,
+                                    "Salidas"),
+
+                                Diferencia = LeerDecimal(
+                                    reader,
+                                    "Diferencia"),
+
+                                PorcentajeEntregado = LeerDecimal(
+                                    reader,
+                                    "PorcentajeEntregado"),
+
+                                CantidadPlanillas = LeerEntero(
+                                    reader,
+                                    "CantidadPlanillas"),
+
+                                BeneficiariosPagados = LeerEntero(
+                                    reader,
+                                    "BeneficiariosPagados")
+                            });
+                    }
+                }
+
+                /*
+                 * RESULTADO 11:
+                 * Distribución de los fondos entregados por tipo de misión.
+                 */
+                if (await reader.NextResultAsync(ct))
+                {
+                    while (await reader.ReadAsync(ct))
+                    {
+                        resultado.DistribucionSalidas.Add(
+                            new DashboardDistribucionSalida
+                            {
+                                IdTipoMision = LeerEnteroNullable(
+                                    reader,
+                                    "IdTipoMision"),
+
+                                TipoMision = LeerTexto(
+                                    reader,
+                                    "TipoMision"),
+
+                                MontoEntregado = LeerDecimal(
+                                    reader,
+                                    "MontoEntregado"),
+
+                                PorcentajeTotal = LeerDecimal(
+                                    reader,
+                                    "PorcentajeTotal"),
+
+                                CantidadPlanillas = LeerEntero(
+                                    reader,
+                                    "CantidadPlanillas"),
+
+                                CantidadBeneficiarios = LeerEntero(
+                                    reader,
+                                    "CantidadBeneficiarios")
+                            });
+                    }
+                }
+
+                /*
+                 * RESULTADO 12:
+                 * Principales beneficiarios de los fondos entregados.
+                 */
+                if (await reader.NextResultAsync(ct))
+                {
+                    while (await reader.ReadAsync(ct))
+                    {
+                        resultado.PrincipalesBeneficiarios.Add(
+                            new DashboardBeneficiarioFondos
+                            {
+                                IdMisionero = LeerEnteroNullable(
+                                    reader,
+                                    "IdMisionero"),
+
+                                Misionero = LeerTexto(
+                                    reader,
+                                    "Misionero"),
+
+                                IdTipoMision = LeerEnteroNullable(
+                                    reader,
+                                    "IdTipoMision"),
+
+                                TipoMision = LeerTexto(
+                                    reader,
+                                    "TipoMision"),
+
+                                MontoEntregado = LeerDecimal(
+                                    reader,
+                                    "MontoEntregado"),
+
+                                CantidadPlanillas = LeerEntero(
+                                    reader,
+                                    "CantidadPlanillas"),
+
+                                UltimaEntrega = LeerFechaNullable(
+                                    reader,
+                                    "UltimaEntrega")
+                            });
+                    }
+                }
+
+                resultado.IngresosVsSalidas =
+                    resultado.IngresosVsSalidas
+                        .OrderBy(x => x.Periodo)
+                        .ToList();
+
+                resultado.DistribucionSalidas =
+                    resultado.DistribucionSalidas
+                        .OrderByDescending(x => x.MontoEntregado)
+                        .ToList();
+
+                resultado.PrincipalesBeneficiarios =
+                    resultado.PrincipalesBeneficiarios
+                        .OrderByDescending(x => x.MontoEntregado)
+                        .ToList();
+
+
+            }
+
+            resultado.Diario =
+                resultado.Diario
+                    .OrderBy(x => x.Fecha)
+                    .ToList();
+
             return resultado;
         }
 
