@@ -8,6 +8,8 @@ builder.Services.AddRazorPages();
 builder.Services.AddScoped<IDashboardDAL, DashboardDAL>();
 builder.Services
     .AddScoped<IngresoControlOperativoRepository>();
+builder.Services
+    .AddScoped<IngresoControlOperativoRepository>();
 
 var app = builder.Build();
 

@@ -1,0 +1,617 @@
+﻿@page
+@model AMINICAD.Pages.Misioneros.IndexModel
+@using System.Globalization
+
+@{
+    ViewData["Title"] = "Misioneros y fondos";
+
+    var cultura =
+        CultureInfo.GetCultureInfo("es-NI");
+
+    var tipos =
+        Model.TiposMision
+            .OrderByDescending(x => x.Saldo)
+            .ThenBy(x => x.TipoMision)
+            .ToList();
+
+    string FormatearDinero(decimal valor)
+    {
+        return $"C$ {valor.ToString("N2", cultura)}";
+    }
+
+    string FormatearPorcentaje(decimal valor)
+    {
+        return $"{valor.ToString("N1", cultura)}%";
+    }
+
+    string ClaseEstado(string estado)
+    {
+        return estado switch
+        {
+            "Saldo negativo" => "misionero-status-negative",
+            "Conciliado" => "misionero-status-balanced",
+            "Sin movimiento" => "misionero-status-empty",
+            _ => "misionero-status-pending"
+        };
+    }
+
+    string IconoTipo(string tipoMision)
+    {
+        var texto =
+            tipoMision.ToUpperInvariant();
+
+        if (texto.Contains("EXTR"))
+        {
+            return "bi-globe-americas";
+        }
+
+        if (texto.Contains("CASTILLO"))
+        {
+            return "bi-people";
+        }
+
+        return "bi-building";
+    }
+}
+
+<div class="dashboard-container misioneros-page">
+    <div class="page-header misioneros-page-header">
+        <div>
+            <div class="page-pretitle">
+                Portafolio financiero
+            </div>
+
+            <h1 class="page-title">
+                Misioneros y fondos
+            </h1>
+
+            <p class="page-description">
+                Ingresos acumulados, asignaciones realizadas y saldos,
+                organizados por tipo de misión.
+            </p>
+        </div>
+
+        <div class="page-actions">
+            <div class="misioneros-cutoff">
+                <span class="misioneros-cutoff-icon">
+                    <i class="bi bi-clock-history"></i>
+                </span>
+
+                <div>
+                    <span>Período consultado</span>
+                    <strong>Histórico acumulado</strong>
+                    <small>Todos los movimientos registrados</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.MensajeError))
+    {
+        <section class="dashboard-card">
+            <div class="dashboard-card-body">
+                <div class="quality-warning mt-0">
+                    <i class="bi bi-exclamation-triangle"></i>
+
+                    <div>
+                        <strong>
+                            No fue posible cargar el módulo
+                        </strong>
+
+                        <span>
+                            @Model.MensajeError
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    }
+    else if (!Model.TieneDatos)
+    {
+        <section class="dashboard-card">
+            <div class="dashboard-card-body">
+                <div class="no-data show py-5">
+                    <div class="no-data-icon">
+                        <i class="bi bi-person-x"></i>
+                    </div>
+
+                    <strong>
+                        No hay registros disponibles
+                    </strong>
+
+                    <span>
+                        No se encontraron misioneros o fondos administrados.
+                    </span>
+                </div>
+            </div>
+        </section>
+    }
+    else
+    {
+        <!-- INDICADORES GENERALES -->
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-sm-6 col-xl-3">
+                <article class="kpi-card"
+                         style="--kpi-accent:#1f2758; --kpi-soft:#eef0f8;">
+                    <div class="kpi-card-body">
+                        <div class="kpi-icon">
+                            <i class="bi bi-person-badge"></i>
+                        </div>
+
+                        <div class="kpi-content">
+                            <div class="kpi-label">
+                                Registros administrados
+                            </div>
+
+                            <div class="kpi-value">
+                                @Model.Resumen.CantidadMisioneros.ToString("N0", cultura)
+                            </div>
+
+                            <div class="kpi-note">
+                                @Model.Resumen.CantidadConMovimiento.ToString("N0", cultura)
+                                con movimientos históricos
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <article class="kpi-card"
+                         style="--kpi-accent:#1769aa; --kpi-soft:#e9f3fb;">
+                    <div class="kpi-card-body">
+                        <div class="kpi-icon">
+                            <i class="bi bi-cash-stack"></i>
+                        </div>
+
+                        <div class="kpi-content">
+                            <div class="kpi-label">
+                                Ingresos acumulados
+                            </div>
+
+                            <div class="kpi-value kpi-value-responsive">
+                                @FormatearDinero(Model.Resumen.TotalIngresos)
+                            </div>
+
+                            <div class="kpi-note">
+                                Fondo registrado históricamente
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <article class="kpi-card"
+                         style="--kpi-accent:#16803c; --kpi-soft:#eaf7ef;">
+                    <div class="kpi-card-body">
+                        <div class="kpi-icon">
+                            <i class="bi bi-wallet2"></i>
+                        </div>
+
+                        <div class="kpi-content">
+                            <div class="kpi-label">
+                                Saldo administrado
+                            </div>
+
+                            <div class="kpi-value kpi-value-responsive">
+                                @FormatearDinero(Model.Resumen.SaldoTotal)
+                            </div>
+
+                            <div class="kpi-note positive">
+                                @Model.Resumen.CantidadConSaldo.ToString("N0", cultura)
+                                registros con saldo
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <article class="kpi-card"
+                         style="--kpi-accent:#d8292f; --kpi-soft:#fdeced;">
+                    <div class="kpi-card-body">
+                        <div class="kpi-icon">
+                            <i class="bi bi-exclamation-triangle"></i>
+                        </div>
+
+                        <div class="kpi-content">
+                            <div class="kpi-label">
+                                Saldos negativos
+                            </div>
+
+                            <div class="kpi-value">
+                                @Model.Resumen.CantidadSaldoNegativo.ToString("N0", cultura)
+                            </div>
+
+                            <div class="kpi-note negative">
+                                Requieren revisión o conciliación
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </div>
+
+        <!-- RESUMEN POR TIPO DE MISIÓN -->
+        <section class="dashboard-card mb-3">
+            <header class="dashboard-card-header">
+                <div class="card-heading">
+                    <h2>
+                        Distribución por tipo de misión
+                    </h2>
+
+                    <p>
+                        Selecciona un grupo para abrir su tabla independiente.
+                    </p>
+                </div>
+
+                <span class="card-badge">
+                    @tipos.Count.ToString("N0", cultura) grupos
+                </span>
+            </header>
+
+            <div class="dashboard-card-body">
+                <div class="mision-type-grid"
+                     role="tablist"
+                     aria-label="Tipos de misión">
+
+                    @for (var indice = 0; indice < tipos.Count; indice++)
+                    {
+                        var tipo = tipos[indice];
+                        var activo = indice == 0;
+                        var porcentajeBarra =
+                            Math.Clamp(
+                                tipo.PorcentajeSaldo,
+                                0m,
+                                100m
+                            );
+
+                        <button type="button"
+                                class="mision-type-card tone-@((indice % 3) + 1) @(activo ? "active" : string.Empty)"
+                                id="tipo-tab-@tipo.IdTipoMision"
+                                data-bs-toggle="tab"
+                                data-bs-target="#tipo-panel-@tipo.IdTipoMision"
+                                role="tab"
+                                aria-controls="tipo-panel-@tipo.IdTipoMision"
+                                aria-selected="@(activo ? "true" : "false")">
+
+                            <div class="mision-type-card-top">
+                                <span class="mision-type-icon">
+                                    <i class="bi @IconoTipo(tipo.TipoMision)"></i>
+                                </span>
+
+                                <span class="mision-type-count">
+                                    @tipo.CantidadMisioneros.ToString("N0", cultura)
+                                    registros
+                                </span>
+                            </div>
+
+                            <div class="mision-type-name">
+                                @tipo.TipoMision
+                            </div>
+
+                            <div class="mision-type-balance">
+                                @FormatearDinero(tipo.Saldo)
+                            </div>
+
+                            <div class="mision-type-caption">
+                                Saldo disponible ·
+                                @FormatearPorcentaje(tipo.PorcentajeSaldo)
+                                del total
+                            </div>
+
+                            <div class="mision-type-progress"
+                                 aria-hidden="true">
+                                <span style="width:@porcentajeBarra.ToString("0.##", CultureInfo.InvariantCulture)%"></span>
+                            </div>
+
+                            <div class="mision-type-footer">
+                                <span>
+                                    @tipo.CantidadConSaldo.ToString("N0", cultura)
+                                    con saldo
+                                </span>
+
+                                <span class="@(tipo.CantidadSaldoNegativo > 0 ? "text-danger" : string.Empty)">
+                                    @tipo.CantidadSaldoNegativo.ToString("N0", cultura)
+                                    negativos
+                                </span>
+                            </div>
+                        </button>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <!-- TABLAS INDEPENDIENTES -->
+        <div class="tab-content">
+            @for (var indice = 0; indice < tipos.Count; indice++)
+            {
+                var tipo = tipos[indice];
+                var activo = indice == 0;
+
+                var registros =
+                    Model.Misioneros
+                        .Where(
+                            x =>
+                                x.IdTipoMision
+                                == tipo.IdTipoMision
+                        )
+                        .OrderByDescending(x => x.Saldo)
+                        .ThenBy(x => x.Misionero)
+                        .ToList();
+
+                <div class="tab-pane fade @(activo ? "show active" : string.Empty)"
+                     id="tipo-panel-@tipo.IdTipoMision"
+                     role="tabpanel"
+                     aria-labelledby="tipo-tab-@tipo.IdTipoMision"
+                     tabindex="0">
+
+                    <section class="dashboard-card">
+                        <header class="dashboard-card-header misioneros-table-header">
+                            <div class="card-heading">
+                                <h2>
+                                    @tipo.TipoMision
+                                </h2>
+
+                                <p>
+                                    @FormatearDinero(tipo.TotalIngresos)
+                                    recibidos ·
+                                    @FormatearDinero(tipo.TotalSalidas)
+                                    planillados ·
+                                    @FormatearPorcentaje(tipo.PorcentajeEjecucion)
+                                    ejecutado
+                                </p>
+                            </div>
+
+                            <div class="misioneros-table-actions">
+                                <label class="misioneros-search"
+                                       for="buscar-@tipo.IdTipoMision">
+                                    <i class="bi bi-search"></i>
+
+                                    <input type="search"
+                                           id="buscar-@tipo.IdTipoMision"
+                                           class="form-control form-control-sm"
+                                           placeholder="Buscar nombre o código..."
+                                           autocomplete="off"
+                                           data-misionero-search
+                                           data-table-id="tabla-@tipo.IdTipoMision" />
+                                </label>
+
+                                <span class="card-badge"
+                                      data-result-count="@tipo.IdTipoMision">
+                                    @registros.Count.ToString("N0", cultura)
+                                    registros
+                                </span>
+                            </div>
+                        </header>
+
+                        <div class="dashboard-card-body p-0">
+                            <div class="dashboard-table-wrapper">
+                                <table class="dashboard-table table align-middle mb-0"
+                                       id="tabla-@tipo.IdTipoMision">
+                                    <thead>
+                                        <tr>
+                                            <th>
+                                                Beneficiario o fondo
+                                            </th>
+
+                                            <th class="text-end">
+                                                Ingresos
+                                            </th>
+
+                                            <th class="text-end">
+                                                Planillado
+                                            </th>
+
+                                            <th class="text-end">
+                                                Saldo
+                                            </th>
+
+                                            <th>
+                                                Ejecución
+                                            </th>
+
+                                            <th>
+                                                Estado
+                                            </th>
+
+                                            <th class="text-end">
+                                                Acción
+                                            </th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+                                        @foreach (var registro in registros)
+                                        {
+                                            var porcentajeVisual =
+                                                Math.Clamp(
+                                                    registro.PorcentajeEjecucion,
+                                                    0m,
+                                                    100m
+                                                );
+
+                                            var textoBusqueda =
+                                                $"{registro.IdMisionero} {registro.Misionero}"
+                                                    .ToLowerInvariant();
+
+                                            <tr data-misionero-row
+                                                data-search="@textoBusqueda">
+                                                <td>
+                                                    <div class="table-entity">
+                                                        <span class="entity-avatar entity-avatar-blue">
+                                                            @registro.Misionero
+                                                                .Substring(0, 1)
+                                                                .ToUpperInvariant()
+                                                        </span>
+
+                                                        <div>
+                                                            <div class="entity-name">
+                                                                @registro.Misionero
+                                                            </div>
+
+                                                            <div class="table-subtitle">
+                                                                Código
+                                                                @registro.IdMisionero.ToString("D3", cultura)
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+
+                                                <td class="text-end">
+                                                    @FormatearDinero(registro.Ingreso)
+                                                </td>
+
+                                                <td class="text-end">
+                                                    @FormatearDinero(registro.Salida)
+                                                </td>
+
+                                                <td class="text-end table-money @(registro.Saldo < 0 ? "text-danger" : string.Empty)">
+                                                    @FormatearDinero(registro.Saldo)
+                                                </td>
+
+                                                <td>
+                                                    <div class="misionero-execution">
+                                                        <div class="misionero-execution-top">
+                                                            <span>
+                                                                @FormatearPorcentaje(registro.PorcentajeEjecucion)
+                                                            </span>
+                                                        </div>
+
+                                                        <div class="misionero-execution-track">
+                                                            <span style="width:@porcentajeVisual.ToString("0.##", CultureInfo.InvariantCulture)%"></span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+
+                                                <td>
+                                                    <span class="misionero-status @ClaseEstado(registro.EstadoSaldo)">
+                                                        @registro.EstadoSaldo
+                                                    </span>
+                                                </td>
+
+                                                <td class="text-end">
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-secondary misionero-detail-button"
+                                                            disabled
+                                                            title="La ficha individual se construirá en la siguiente etapa">
+                                                        Ver ficha
+                                                        <i class="bi bi-arrow-right ms-1"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+
+                                        <tr class="misionero-empty-search"
+                                            data-empty-row
+                                            hidden>
+                                            <td colspan="7">
+                                                <div class="no-data show py-4">
+                                                    <div class="no-data-icon">
+                                                        <i class="bi bi-search"></i>
+                                                    </div>
+
+                                                    <strong>
+                                                        No se encontraron coincidencias
+                                                    </strong>
+
+                                                    <span>
+                                                        Prueba con otro nombre o código.
+                                                    </span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@section Scripts
+{
+    <script>
+        (() => {
+            const normalizar = (texto) =>
+                (texto ?? "")
+                    .toString()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .toLowerCase()
+                    .trim();
+
+            document
+                .querySelectorAll("[data-misionero-search]")
+                .forEach((input) => {
+                    input.addEventListener("input", () => {
+                        const tableId =
+                            input.dataset.tableId;
+
+                        const table =
+                            document.getElementById(tableId);
+
+                        if (!table) {
+                            return;
+                        }
+
+                        const termino =
+                            normalizar(input.value);
+
+                        const rows =
+                            Array.from(
+                                table.querySelectorAll(
+                                    "[data-misionero-row]"
+                                )
+                            );
+
+                        let visibles = 0;
+
+                        rows.forEach((row) => {
+                            const contenido =
+                                normalizar(
+                                    row.dataset.search
+                                );
+
+                            const mostrar =
+                                termino.length === 0
+                                || contenido.includes(termino);
+
+                            row.hidden = !mostrar;
+
+                            if (mostrar) {
+                                visibles++;
+                            }
+                        });
+
+                        const emptyRow =
+                            table.querySelector(
+                                "[data-empty-row]"
+                            );
+
+                        if (emptyRow) {
+                            emptyRow.hidden =
+                                visibles !== 0;
+                        }
+
+                        const panel =
+                            table.closest(".tab-pane");
+
+                        const badge =
+                            panel?.querySelector(
+                                "[data-result-count]"
+                            );
+
+                        if (badge) {
+                            badge.textContent =
+                                `${visibles.toLocaleString("es-NI")} registros`;
+                        }
+                    });
+                });
+        })();
+    </script>
+}
