@@ -1,5 +1,6 @@
 using AMINICAD.DAL;
 using AMINICAD.Data.Ingresos;
+using AMINICAD.Data.Misioneros;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,7 +10,7 @@ builder.Services.AddScoped<IDashboardDAL, DashboardDAL>();
 builder.Services
     .AddScoped<IngresoControlOperativoRepository>();
 builder.Services
-    .AddScoped<IngresoControlOperativoRepository>();
+    .AddScoped<MisioneroRepository>();
 
 var app = builder.Build();
 

@@ -823,6 +823,184 @@ textarea {
   font-weight: 700;
 }
 
+/* MISIONEROS */
+
+.mision-type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mision-type-card {
+  --mission-accent: var(--aminicad-primary);
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 15px;
+  color: inherit;
+  background: #ffffff;
+  border: 1px solid var(--aminicad-border);
+  border-radius: 11px;
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.mision-type-card.tone-2 {
+  --mission-accent: #1769aa;
+}
+
+.mision-type-card.tone-3 {
+  --mission-accent: #16803c;
+}
+
+.mision-type-card:hover {
+  color: inherit;
+  border-color: color-mix(in srgb, var(--mission-accent) 40%, white);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.mision-type-card.active {
+  border-color: var(--mission-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mission-accent) 12%, transparent);
+}
+
+.mision-type-card-top,
+.mision-type-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mision-type-icon {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--mission-accent);
+  background: color-mix(in srgb, var(--mission-accent) 10%, white);
+  border-radius: 9px;
+}
+
+.mision-type-count,
+.mision-type-caption,
+.mision-type-footer {
+  color: var(--aminicad-muted);
+  font-size: 0.6rem;
+}
+
+.mision-type-name {
+  margin-top: 12px;
+  overflow: hidden;
+  color: var(--aminicad-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mision-type-balance {
+  margin-top: 5px;
+  color: var(--aminicad-primary-dark);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.mision-type-caption {
+  margin-top: 3px;
+}
+
+.mision-type-progress,
+.misionero-execution-track {
+  height: 6px;
+  overflow: hidden;
+  background: var(--aminicad-primary-soft);
+  border-radius: 20px;
+}
+
+.mision-type-progress {
+  margin: 12px 0 9px;
+}
+
+.mision-type-progress > span,
+.misionero-execution-track > span {
+  display: block;
+  height: 100%;
+  background: var(--mission-accent, var(--aminicad-primary));
+  border-radius: inherit;
+}
+
+.misioneros-table-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.misioneros-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.misioneros-search > i {
+  position: absolute;
+  left: 10px;
+  z-index: 1;
+  color: var(--aminicad-muted);
+  font-size: 0.7rem;
+}
+
+.misioneros-search .form-control {
+  width: 230px;
+  min-height: 34px;
+  padding-left: 30px;
+  font-size: 0.68rem;
+}
+
+.misionero-execution {
+  min-width: 105px;
+  color: var(--aminicad-muted);
+  font-size: 0.61rem;
+}
+
+.misionero-execution-track {
+  margin-top: 5px;
+}
+
+.misionero-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 7px;
+  font-size: 0.59rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.misionero-status-pending {
+  color: #1769aa;
+  background: #e9f3fb;
+}
+
+.misionero-status-balanced {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.misionero-status-negative {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.misionero-status-empty {
+  color: var(--aminicad-muted);
+  background: var(--aminicad-bg);
+}
+
 /* RANKING MENSUAL */
 
 .month-list {
@@ -1522,6 +1700,10 @@ a:focus-visible,
   .chart-regions {
     height: 340px;
   }
+
+  .mision-type-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 767.98px) {
@@ -1563,6 +1745,21 @@ a:focus-visible,
 
   .distribution-row-copy strong {
     max-width: 145px;
+  }
+
+  .mision-type-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .misioneros-table-header,
+  .misioneros-table-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .misioneros-search,
+  .misioneros-search .form-control {
+    width: 100%;
   }
 }
 

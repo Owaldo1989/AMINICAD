@@ -21,6 +21,9 @@ namespace AMINICAD.Pages.Misioneros
         public MisioneroIndexDto Datos { get; private set; }
             = new();
 
+        [BindProperty(SupportsGet = true)]
+        public int? IdTipoMision { get; set; }
+
         public MisioneroResumenGeneralDto Resumen =>
             Datos.Resumen;
 
@@ -33,7 +36,16 @@ namespace AMINICAD.Pages.Misioneros
         public string? MensajeError { get; private set; }
 
         public bool TieneDatos =>
+            TiposMision.Count > 0;
+
+        public bool TieneDetalle =>
             Misioneros.Count > 0;
+
+        public TipoMisionResumenDto? TipoMisionSeleccionado =>
+            IdTipoMision.HasValue
+                ? TiposMision.FirstOrDefault(
+                    x => x.IdTipoMision == IdTipoMision.Value)
+                : null;
 
         public async Task OnGetAsync(
             CancellationToken cancellationToken)
@@ -42,6 +54,7 @@ namespace AMINICAD.Pages.Misioneros
             {
                 Datos =
                     await _repository.ObtenerIndexAsync(
+                        IdTipoMision,
                         cancellationToken
                     );
             }

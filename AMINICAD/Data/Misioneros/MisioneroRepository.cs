@@ -20,6 +20,7 @@ namespace AMINICAD.Data.Misioneros
 
         public async Task<MisioneroIndexDto>
             ObtenerIndexAsync(
+                int? idTipoMision,
                 CancellationToken cancellationToken = default)
         {
             var resultado = new MisioneroIndexDto();
@@ -37,6 +38,18 @@ namespace AMINICAD.Data.Misioneros
                 CommandType.StoredProcedure;
 
             command.CommandTimeout = 120;
+
+            command.Parameters.Add(
+                new SqlParameter(
+                    "@IdTipoMision",
+                    SqlDbType.Int
+                )
+                {
+                    Value = idTipoMision.HasValue
+                        ? idTipoMision.Value
+                        : DBNull.Value
+                }
+            );
 
             await connection.OpenAsync(
                 cancellationToken
