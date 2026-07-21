@@ -532,6 +532,43 @@ textarea {
   background-color: var(--aminicad-bg);
 }
 
+.filter-card .form-control {
+  width: 142px;
+  min-height: 34px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  font-size: 0.72rem;
+  border-color: transparent;
+  background-color: var(--aminicad-bg);
+}
+
+.ingreso-page-actions {
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.ingreso-period-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.ingreso-period-shortcuts .btn {
+  min-height: 30px;
+  font-size: 0.65rem;
+}
+
+.ingreso-range-filter {
+  align-items: flex-end;
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
 .status-chip {
   display: inline-flex;
   align-items: center;
@@ -1496,6 +1533,25 @@ a:focus-visible,
     width: 100%;
   }
 
+  .filter-card .form-control,
+  .filter-card .form-select {
+    width: 100%;
+  }
+
+  .ingreso-page-actions {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .ingreso-period-shortcuts {
+    justify-content: flex-start;
+  }
+
+  .ingreso-range-filter {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  }
+
   .card-header-meta {
     align-items: flex-end;
     flex-direction: column;
@@ -1507,5 +1563,15 @@ a:focus-visible,
 
   .distribution-row-copy strong {
     max-width: 145px;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .ingreso-range-filter {
+    grid-template-columns: 1fr;
+  }
+
+  .ingreso-range-filter .btn {
+    width: 100%;
   }
 }

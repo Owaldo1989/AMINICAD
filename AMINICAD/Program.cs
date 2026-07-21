@@ -1,12 +1,16 @@
 using AMINICAD.DAL;
+using AMINICAD.Data.Ingresos;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddScoped<IDashboardDAL, DashboardDAL>();
+builder.Services
+    .AddScoped<IngresoControlOperativoRepository>();
 
 var app = builder.Build();
+
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

@@ -1,0 +1,440 @@
+@page
+@model AMINICAD.Pages.Ingresos.IndexModel
+
+@using System.Globalization
+
+@{
+    ViewData["Title"] = "Control de ingresos";
+
+    var cultura = CultureInfo.GetCultureInfo("es-NI");
+    var hoy = DateTime.Today;
+    var fechaInicial = Model.FechaInicial?.Date ?? hoy;
+    var fechaFinal = Model.FechaFinal?.Date ?? hoy;
+    var fechaInicialValor = fechaInicial.ToString("yyyy-MM-dd");
+    var fechaFinalValor = fechaFinal.ToString("yyyy-MM-dd");
+    var fechaMaxima = hoy.ToString("yyyy-MM-dd");
+    var inicioSemana = hoy.AddDays(-(((int)hoy.DayOfWeek + 6) % 7));
+    var inicioMes = new DateTime(hoy.Year, hoy.Month, 1);
+    var textoPeriodo = fechaInicial == fechaFinal
+        ? fechaInicial.ToString("dd/MM/yyyy", cultura)
+        : $"{fechaInicial:dd/MM/yyyy} al {fechaFinal:dd/MM/yyyy}";
+
+    string FormatearDinero(decimal valor)
+    {
+        return $"C$ {valor.ToString("N2", cultura)}";
+    }
+}
+
+<div class="dashboard-container">
+    <div class="page-header ingreso-page-header">
+        <div>
+            <div class="page-pretitle">Control operativo</div>
+            <h1 class="page-title">Ingresos registrados</h1>
+            <p class="page-description">
+                Actividad diaria, fechas contables, cuentas utilizadas y validaciones del período seleccionado.
+            </p>
+        </div>
+
+        <div class="page-actions ingreso-page-actions">
+            <div class="ingreso-period-shortcuts" aria-label="Períodos rápidos">
+                <a asp-page="./Index"
+                   asp-route-FechaInicial="@fechaMaxima"
+                   asp-route-FechaFinal="@fechaMaxima"
+                   class="btn btn-sm btn-outline-secondary">Hoy</a>
+                <a asp-page="./Index"
+                   asp-route-FechaInicial="@inicioSemana.ToString("yyyy-MM-dd")"
+                   asp-route-FechaFinal="@fechaMaxima"
+                   class="btn btn-sm btn-outline-secondary">Esta semana</a>
+                <a asp-page="./Index"
+                   asp-route-FechaInicial="@inicioMes.ToString("yyyy-MM-dd")"
+                   asp-route-FechaFinal="@fechaMaxima"
+                   class="btn btn-sm btn-outline-secondary">Este mes</a>
+            </div>
+
+            <form method="get" class="filter-card ingreso-range-filter">
+                <div class="filter-field">
+                    <label asp-for="FechaInicial">Desde</label>
+                    <input asp-for="FechaInicial"
+                           type="date"
+                           value="@fechaInicialValor"
+                           max="@fechaMaxima"
+                           class="form-control form-control-sm" />
+                </div>
+                <div class="filter-field">
+                    <label asp-for="FechaFinal">Hasta</label>
+                    <input asp-for="FechaFinal"
+                           type="date"
+                           value="@fechaFinalValor"
+                           max="@fechaMaxima"
+                           class="form-control form-control-sm" />
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-search me-1"></i>Consultar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.MensajeError))
+    {
+        <section class="dashboard-card mb-3">
+            <div class="dashboard-card-body">
+                <div class="quality-warning mt-0">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <div>
+                        <strong>No fue posible cargar los ingresos</strong>
+                        <span>@Model.MensajeError</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    }
+    else if (!Model.TieneDatos)
+    {
+        <section class="dashboard-card">
+            <div class="dashboard-card-body">
+                <div class="no-data show py-5">
+                    <div class="no-data-icon"><i class="bi bi-inbox"></i></div>
+                    <strong>Sin ingresos registrados</strong>
+                    <span>No se encontraron ingresos grabados del @textoPeriodo.</span>
+                </div>
+            </div>
+        </section>
+    }
+    else
+    {
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-sm-6 col-xl-3">
+                <article class="kpi-card" style="--kpi-accent:#1f2758; --kpi-soft:#eef0f8;">
+                    <div class="kpi-card-body">
+                        <div class="kpi-icon"><i class="bi bi-receipt"></i></div>
+                        <div class="kpi-content">
+                            <div class="kpi-label">Ingresos grabados</div>
+                            <div class="kpi-value">@Model.Resumen.CantidadIngresos.ToString("N0", cultura)</div>
+                            <div class="kpi-note">
+                                @Model.CantidadDiasConActividad días · @Model.Resumen.CantidadRecibosFisicos.ToString("N0", cultura) recibos
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <article class="kpi-card" style="--kpi-accent:#16803c; --kpi-soft:#eaf7ef;">
+                    <div class="kpi-card-body">
+                        <div class="kpi-icon"><i class="bi bi-cash-stack"></i></div>
+                        <div class="kpi-content">
+                            <div class="kpi-label">Total del período</div>
+                            <div class="kpi-value kpi-value-responsive">@FormatearDinero(Model.Resumen.TotalRegistrado)</div>
+                            <div class="kpi-note positive">
+                                @Model.Resumen.CantidadCuentasUtilizadas.ToString("N0", cultura) cuentas utilizadas
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <article class="kpi-card" style="--kpi-accent:#1769aa; --kpi-soft:#e9f3fb;">
+                    <div class="kpi-card-body">
+                        <div class="kpi-icon"><i class="bi bi-safe2"></i></div>
+                        <div class="kpi-content">
+                            <div class="kpi-label">Caja General</div>
+                            <div class="kpi-value kpi-value-responsive">@FormatearDinero(Model.Resumen.TotalCajaGeneral)</div>
+                            <div class="kpi-note">Acumulado · Cuenta 110001</div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <article class="kpi-card" style="--kpi-accent:#d8292f; --kpi-soft:#fdeced;">
+                    <div class="kpi-card-body">
+                        <div class="kpi-icon"><i class="bi bi-calendar2-minus"></i></div>
+                        <div class="kpi-content">
+                            <div class="kpi-label">Fechas anteriores</div>
+                            <div class="kpi-value">@Model.Resumen.IngresosFechasAnteriores.ToString("N0", cultura)</div>
+                            <div class="kpi-note negative">
+                                @Model.Resumen.PorcentajeFechasAnteriores.ToString("N2", cultura)% de los ingresos
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </div>
+
+        <section class="dashboard-card mb-3">
+            <header class="dashboard-card-header">
+                <div class="card-heading">
+                    <h2>Actividad diaria</h2>
+                    <p>Resultados agrupados por el día real en que fueron grabados.</p>
+                </div>
+                <span class="card-badge">@Model.CantidadDiasConActividad días con actividad</span>
+            </header>
+            <div class="dashboard-card-body p-0">
+                <div class="dashboard-table-wrapper">
+                    <table class="dashboard-table table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Fecha de grabación</th>
+                                <th class="text-end">Ingresos</th>
+                                <th class="text-end">Recibos</th>
+                                <th class="text-end">Fechas contables</th>
+                                <th class="text-end">Caja General</th>
+                                <th class="text-end">Otras cuentas</th>
+                                <th class="text-end">Total</th>
+                                <th class="text-end">Alertas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var dia in Model.ActividadDiaria)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="table-entity">
+                                            <span class="entity-avatar entity-avatar-blue"><i class="bi bi-calendar-check"></i></span>
+                                            <div>
+                                                <div class="entity-name">@dia.FechaGrabacion.ToString("dd/MM/yyyy", cultura)</div>
+                                                <div class="table-subtitle">Día de grabación</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-end">@dia.CantidadIngresos.ToString("N0", cultura)</td>
+                                    <td class="text-end">@dia.CantidadRecibosFisicos.ToString("N0", cultura)</td>
+                                    <td class="text-end">@dia.CantidadFechasContables.ToString("N0", cultura)</td>
+                                    <td class="text-end">@FormatearDinero(dia.TotalCajaGeneral)</td>
+                                    <td class="text-end">@FormatearDinero(dia.TotalOtrasCuentas)</td>
+                                    <td class="text-end table-money">@FormatearDinero(dia.TotalRegistrado)</td>
+                                    <td class="text-end">
+                                        @if (dia.CantidadAlertas == 0)
+                                        {
+                                            <span class="badge text-bg-success">Sin alertas</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge text-bg-warning">@dia.CantidadAlertas</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section class="dashboard-card mb-3">
+            <header class="dashboard-card-header">
+                <div class="card-heading">
+                    <h2>Distribución por cuenta del período seleccionado</h2>
+                    <p>Participación de cada cuenta sobre el total registrado del @textoPeriodo.</p>
+                </div>
+                <span class="card-badge">@Model.Cuentas.Count.ToString("N0", cultura) cuentas</span>
+            </header>
+            <div class="dashboard-card-body p-0">
+                <div class="dashboard-table-wrapper">
+                    <table class="dashboard-table dashboard-table-compact table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Cuenta</th>
+                                <th class="text-end">Ingresos</th>
+                                <th class="text-end">Recibos</th>
+                                <th class="text-end">Total del período</th>
+                                <th class="text-end">Participación</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var cuenta in Model.Cuentas)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="table-entity">
+                                            <span class="entity-avatar @(cuenta.EsCajaGeneral ? "entity-avatar-blue" : "entity-avatar-red")">
+                                                <i class="bi bi-bank"></i>
+                                            </span>
+                                            <div>
+                                                <div class="entity-name">@cuenta.Cuenta</div>
+                                                <div class="table-subtitle">Código @cuenta.CodCuenta</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-end">@cuenta.CantidadIngresos.ToString("N0", cultura)</td>
+                                    <td class="text-end">@cuenta.CantidadRecibosFisicos.ToString("N0", cultura)</td>
+                                    <td class="text-end table-money">@FormatearDinero(cuenta.TotalRegistrado)</td>
+                                    <td class="text-end">
+                                        <span class="card-badge">@cuenta.PorcentajeParticipacion.ToString("N2", cultura)%</span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-xl-8">
+                <section class="dashboard-card">
+                    <header class="dashboard-card-header">
+                        <div class="card-heading">
+                            <h2>Fechas contables procesadas</h2>
+                            <p>Fechas a las que corresponde el trabajo grabado durante el período.</p>
+                        </div>
+                        <span class="card-badge">@Model.FechasProcesadas.Count.ToString("N0", cultura) fechas</span>
+                    </header>
+                    <div class="dashboard-card-body p-0">
+                        <div class="dashboard-table-wrapper">
+                            <table class="dashboard-table table align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha contable</th>
+                                        <th class="text-end">Ingresos</th>
+                                        <th class="text-end">Recibos</th>
+                                        <th class="text-end">Caja General</th>
+                                        <th class="text-end">Otras cuentas</th>
+                                        <th class="text-end">Total</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in Model.FechasProcesadas)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <div class="entity-name">@item.FechaContable.ToString("dd/MM/yyyy", cultura)</div>
+                                                <div class="table-subtitle">Fecha contable</div>
+                                            </td>
+                                            <td class="text-end">@item.CantidadIngresos.ToString("N0", cultura)</td>
+                                            <td class="text-end">@item.CantidadRecibosFisicos.ToString("N0", cultura)</td>
+                                            <td class="text-end">@FormatearDinero(item.TotalCajaGeneral)</td>
+                                            <td class="text-end">@FormatearDinero(item.TotalOtrasCuentas)</td>
+                                            <td class="text-end table-money">@FormatearDinero(item.TotalRegistrado)</td>
+                                            <td>
+                                                @if (item.DiasDiferencia == 0)
+                                                {
+                                                    <span class="badge text-bg-success">Mismo día</span>
+                                                }
+                                                else if (item.DiasDiferencia > 0 && item.DiasDiferencia <= 3)
+                                                {
+                                                    <span class="badge text-bg-warning">@item.DiasDiferencia día(s)</span>
+                                                }
+                                                else if (item.DiasDiferencia > 3)
+                                                {
+                                                    <span class="badge text-bg-danger">@item.DiasDiferencia días</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge text-bg-danger">Fecha futura</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-12 col-xl-4">
+                <section class="dashboard-card">
+                    <header class="dashboard-card-header">
+                        <div class="card-heading">
+                            <h2>Validaciones del período</h2>
+                            <p>Controles aplicados sobre todos los registros consultados.</p>
+                        </div>
+                    </header>
+                    <div class="dashboard-card-body">
+                        <div class="summary-list">
+                            <div class="summary-item">
+                                <div class="summary-icon"><i class="bi bi-receipt-cutoff"></i></div>
+                                <div class="summary-copy"><strong>Sin recibo físico</strong></div>
+                                <div class="summary-value">@Model.Alertas.IngresosSinReciboFisico</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-icon"><i class="bi bi-dash-circle"></i></div>
+                                <div class="summary-copy"><strong>Sin cuenta</strong></div>
+                                <div class="summary-value">@Model.Alertas.IngresosSinCuenta</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-icon"><i class="bi bi-question-circle"></i></div>
+                                <div class="summary-copy"><strong>Cuenta no identificada</strong></div>
+                                <div class="summary-value">@Model.Alertas.IngresosCuentaNoIdentificada</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-icon"><i class="bi bi-calendar-plus"></i></div>
+                                <div class="summary-copy"><strong>Fecha posterior</strong></div>
+                                <div class="summary-value">@Model.Alertas.IngresosFechaPosterior</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-icon"><i class="bi bi-calendar-x"></i></div>
+                                <div class="summary-copy"><strong>Más de tres días</strong></div>
+                                <div class="summary-value">@Model.Alertas.IngresosConMasTresDias</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-icon"><i class="bi bi-safe"></i></div>
+                                <div class="summary-copy"><strong>Caja General con fecha anterior</strong></div>
+                                <div class="summary-value">@Model.Alertas.CajaGeneralConFechaAnterior</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <section class="dashboard-card">
+            <header class="dashboard-card-header">
+                <div class="card-heading">
+                    <h2>Registros que requieren revisión</h2>
+                    <p>Posibles inconsistencias detectadas durante el período seleccionado.</p>
+                </div>
+                <span class="card-badge">@Model.RegistrosRevision.Count.ToString("N0", cultura) registros</span>
+            </header>
+            <div class="dashboard-card-body p-0">
+                @if (!Model.TieneRegistrosRevision)
+                {
+                    <div class="no-data show py-5">
+                        <div class="no-data-icon"><i class="bi bi-check2-circle"></i></div>
+                        <strong>Sin registros pendientes</strong>
+                        <span>No se encontraron ingresos que requieran revisión.</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="dashboard-table-wrapper">
+                        <table class="dashboard-table table align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>No. ingreso</th>
+                                    <th>No. recibo</th>
+                                    <th>Fecha contable</th>
+                                    <th>Grabado</th>
+                                    <th>Cuenta</th>
+                                    <th class="text-end">Total</th>
+                                    <th>Motivo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model.RegistrosRevision)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold">@item.NoIngreso</td>
+                                        <td>@(item.NoRecibo ?? "Sin recibo")</td>
+                                        <td>@item.FechaContable.ToString("dd/MM/yyyy", cultura)</td>
+                                        <td>@item.FechaHoraGrabacion.ToString("dd/MM/yyyy HH:mm", cultura)</td>
+                                        <td>
+                                            <div class="entity-name">@item.Cuenta</div>
+                                            <div class="table-subtitle">@item.CodCuenta</div>
+                                        </td>
+                                        <td class="text-end table-money">@FormatearDinero(item.Total)</td>
+                                        <td><span class="badge text-bg-warning">@item.MotivoRevision</span></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </section>
+    }
+</div>
