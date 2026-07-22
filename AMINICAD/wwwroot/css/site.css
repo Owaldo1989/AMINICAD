@@ -843,7 +843,10 @@ textarea {
   border-radius: 11px;
   box-shadow: var(--shadow-sm);
   text-decoration: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
 }
 
 .mision-type-card.tone-2 {
@@ -863,7 +866,8 @@ textarea {
 
 .mision-type-card.active {
   border-color: var(--mission-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--mission-accent) 12%, transparent);
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--mission-accent) 12%, transparent);
 }
 
 .mision-type-card-top,
@@ -1770,5 +1774,462 @@ a:focus-visible,
 
   .ingreso-range-filter .btn {
     width: 100%;
+  }
+}
+/* ============================================================
+   DETALLE DEL MISIONERO
+   ============================================================ */
+
+.misionero-detail-page {
+  scroll-behavior: smooth;
+}
+
+.misionero-detail-back {
+  margin-bottom: 14px;
+}
+
+.misionero-detail-back a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--aminicad-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.misionero-detail-back a:hover {
+  color: var(--aminicad-primary);
+}
+
+.misionero-profile-header {
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.misionero-profile {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.misionero-profile-avatar {
+  width: 60px;
+  height: 60px;
+  flex: 0 0 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  background: var(--aminicad-primary);
+  border-radius: 15px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  box-shadow: var(--shadow-md);
+}
+
+.misionero-profile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  margin-top: 6px;
+  color: var(--aminicad-muted);
+  font-size: 0.66rem;
+  font-weight: 600;
+}
+
+.misionero-note {
+  max-width: 720px;
+  margin: 7px 0 0;
+  color: var(--aminicad-muted);
+  font-size: 0.67rem;
+  line-height: 1.55;
+}
+
+.misionero-year-filter {
+  min-width: 145px;
+}
+
+.misionero-year-filter .form-select {
+  width: 110px;
+}
+
+.misionero-section-nav {
+  position: sticky;
+  top: 76px;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 16px;
+  padding: 7px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--aminicad-border);
+  border-radius: 11px;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(10px);
+}
+
+.misionero-section-nav a,
+.misionero-section-nav span {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  color: var(--aminicad-muted);
+  border-radius: 7px;
+  font-size: 0.64rem;
+  font-weight: 600;
+}
+
+.misionero-section-nav a:hover {
+  color: var(--aminicad-primary);
+  background: var(--aminicad-primary-soft);
+}
+
+.misionero-section-nav .disabled {
+  margin-left: auto;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.misionero-section-nav small {
+  padding: 2px 5px;
+  background: var(--aminicad-bg);
+  border-radius: 5px;
+  font-size: 0.52rem;
+}
+
+.misionero-variation {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 15px;
+}
+
+.misionero-variation-icon {
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--aminicad-primary);
+  background: var(--aminicad-primary-soft);
+  border-radius: 12px;
+  font-size: 1.08rem;
+}
+
+.misionero-variation-icon.positive {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.misionero-variation-icon.negative {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.misionero-variation-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.misionero-variation-copy > span {
+  color: var(--aminicad-muted);
+  font-size: 0.64rem;
+  font-weight: 600;
+}
+
+.misionero-variation-copy strong {
+  margin-top: 2px;
+  color: var(--aminicad-primary-dark);
+  font-size: 1rem;
+}
+
+.misionero-variation-copy p {
+  margin: 3px 0 0;
+  color: var(--aminicad-light-text);
+  font-size: 0.62rem;
+}
+
+.misionero-variation-amount {
+  color: var(--aminicad-primary-dark);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.misionero-variation .positive {
+  color: var(--success);
+}
+
+.misionero-variation .negative {
+  color: var(--danger);
+}
+
+.misionero-chart-container {
+  position: relative;
+  height: 335px;
+}
+
+.misionero-funds-chart-container {
+  height: 330px;
+  padding: 18px;
+}
+
+.misionero-insight-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.misionero-insight {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--aminicad-border);
+}
+
+.misionero-insight:last-child {
+  border-bottom: 0;
+}
+
+.misionero-insight-icon {
+  width: 37px;
+  height: 37px;
+  flex: 0 0 37px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+}
+
+.misionero-insight-icon.blue {
+  color: #1769aa;
+  background: #e9f3fb;
+}
+
+.misionero-insight-icon.green {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.misionero-insight-icon.orange {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.misionero-insight-icon.red {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.misionero-insight > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.misionero-insight span {
+  color: var(--aminicad-muted);
+  font-size: 0.61rem;
+}
+
+.misionero-insight strong {
+  margin-top: 2px;
+  color: var(--aminicad-text);
+  font-size: 0.72rem;
+}
+
+.misionero-insight small {
+  margin-top: 2px;
+  color: var(--aminicad-light-text);
+  font-size: 0.58rem;
+}
+
+.misionero-month-change,
+.misionero-average-status {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 58px;
+  padding: 4px 7px;
+  color: var(--aminicad-muted);
+  background: var(--aminicad-bg);
+  border-radius: 20px;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+.misionero-month-change.positive {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.misionero-month-change.negative,
+.misionero-average-status.low {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.misionero-average-status.warning {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.misionero-donor-type,
+.misionero-movement-type {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  color: var(--aminicad-primary);
+  background: var(--aminicad-primary-soft);
+  border-radius: 20px;
+  font-size: 0.57rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.misionero-movement-type.income {
+  color: var(--success);
+  background: var(--success-soft);
+}
+
+.misionero-movement-type.payment {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.misionero-opportunity-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+}
+
+.misionero-opportunity-grid > div {
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  background: var(--aminicad-bg);
+  border-radius: 10px;
+}
+
+.misionero-opportunity-grid span {
+  color: var(--aminicad-muted);
+  font-size: 0.61rem;
+  font-weight: 600;
+}
+
+.misionero-opportunity-grid strong {
+  margin-top: 5px;
+  color: var(--aminicad-primary-dark);
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.misionero-opportunity-grid small {
+  margin-top: 3px;
+  color: var(--aminicad-light-text);
+  font-size: 0.57rem;
+}
+
+.misionero-district-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.misionero-district-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(140px, 2fr) minmax(
+      115px,
+      auto
+    );
+  align-items: center;
+  gap: 15px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--aminicad-border);
+}
+
+.misionero-district-row:last-child {
+  border-bottom: 0;
+}
+
+.misionero-district-row > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.misionero-district-row strong {
+  color: var(--aminicad-text);
+  font-size: 0.69rem;
+}
+
+.misionero-district-row span {
+  margin-top: 2px;
+  color: var(--aminicad-muted);
+  font-size: 0.59rem;
+}
+
+.misionero-district-progress {
+  height: 7px;
+  overflow: hidden;
+  background: var(--aminicad-primary-soft);
+  border-radius: 20px;
+}
+
+.misionero-district-progress span {
+  height: 100%;
+  min-width: 3px;
+  display: block;
+  margin: 0;
+  background: var(--aminicad-primary);
+  border-radius: 20px;
+}
+
+@media (max-width: 767.98px) {
+  .misionero-profile-header {
+    align-items: stretch;
+  }
+
+  .misionero-profile {
+    flex-direction: column;
+  }
+
+  .misionero-year-filter {
+    width: 100%;
+  }
+
+  .misionero-year-filter .form-select {
+    width: 100%;
+  }
+
+  .misionero-section-nav {
+    position: static;
+  }
+
+  .misionero-section-nav .disabled {
+    margin-left: 0;
+  }
+
+  .misionero-variation {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .misionero-variation-amount {
+    grid-column: 2;
+  }
+
+  .misionero-opportunity-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .misionero-district-row {
+    grid-template-columns: 1fr;
+  }
+
+  .misionero-chart-container {
+    height: 300px;
   }
 }

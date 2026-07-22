@@ -12,6 +12,10 @@ builder.Services
 builder.Services
     .AddScoped<MisioneroRepository>();
 
+
+builder.Services
+    .AddScoped<MisioneroDetalleRepository>();
+
 var app = builder.Build();
 
 

@@ -1,0 +1,1538 @@
+﻿@page
+@model AMINICAD.Pages.Misioneros.DetalleModel
+
+@using System.Globalization
+@using System.Text.Json
+
+@{
+    ViewData["Title"] = "Detalle del misionero";
+
+    var cultura =
+        CultureInfo.GetCultureInfo("es-NI");
+
+    var info =
+        Model.Detalle.Informacion;
+
+    var resumen =
+        Model.Detalle.Resumen;
+
+    var comparacion =
+        Model.Detalle.Comparacion;
+
+    var patrocinadores =
+        Model.Detalle.PatrocinadoresResumen;
+
+    var mensual =
+        Model.Detalle.Mensual
+            .Where(x => !x.EsMesFuturo)
+            .OrderBy(x => x.IdMes)
+            .ToList();
+
+    var bajoPromedio =
+        Model.Detalle.BajoPromedio
+            .Take(8)
+            .ToList();
+
+    var distritos =
+        Model.Detalle.Distritos
+            .Take(6)
+            .ToList();
+
+    var fondosPorConcepto =
+        Model.Detalle.FondosPorConcepto
+            .OrderBy(x => x.EsRetencion)
+            .ThenByDescending(x => x.Saldo)
+            .ToList();
+
+    var totalSaldosDistribuidos =
+        fondosPorConcepto
+            .Where(x => x.Saldo > 0)
+            .Sum(x => x.Saldo);
+
+    string Dinero(decimal valor) =>
+        $"C$ {valor.ToString("N2", cultura)}";
+
+    string Porcentaje(decimal valor) =>
+        $"{valor.ToString("N1", cultura)}%";
+
+    string Fecha(DateTime? valor) =>
+        valor.HasValue
+            ? valor.Value.ToString(
+                "dd/MM/yyyy",
+                cultura
+            )
+            : "Sin movimientos";
+
+    string ClaseVariacion()
+    {
+        return comparacion.EstadoVariacion switch
+        {
+            "CRECIMIENTO" => "positive",
+            "DISMINUCION" => "negative",
+            _ => string.Empty
+        };
+    }
+
+    string IconoVariacion()
+    {
+        return comparacion.EstadoVariacion switch
+        {
+            "CRECIMIENTO" => "bi-arrow-up-right",
+            "DISMINUCION" => "bi-arrow-down-right",
+            "NUEVO" => "bi-stars",
+            _ => "bi-dash"
+        };
+    }
+}
+
+<div class="dashboard-container misionero-detail-page">
+
+    <div class="misionero-detail-back">
+        <a asp-page="./Index"
+           asp-route-IdTipoMision="@info.IdTipoMision">
+            <i class="bi bi-arrow-left"></i>
+            Regresar a misioneros
+        </a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.MensajeError))
+    {
+        <section class="dashboard-card">
+            <div class="dashboard-card-body">
+                <div class="quality-warning mt-0">
+                    <i class="bi bi-exclamation-triangle"></i>
+
+                    <div>
+                        <strong>
+                            No fue posible cargar la ficha
+                        </strong>
+
+                        <span>
+                            @Model.MensajeError
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    }
+    else
+    {
+        <div class="page-header misionero-profile-header">
+            <div class="misionero-profile">
+                <div class="misionero-profile-avatar">
+                    @(string.IsNullOrWhiteSpace(info.Misionero)
+                        ? "?"
+                        : info.Misionero
+                            .Substring(0, 1)
+                            .ToUpperInvariant())
+                </div>
+
+                <div>
+                    <div class="page-pretitle">
+                        @info.TipoMision
+                    </div>
+
+                    <h1 class="page-title">
+                        @info.Misionero
+                    </h1>
+
+                    <div class="misionero-profile-meta">
+                        <span>
+                            Código
+                            @info.IdMisionero.ToString("D3")
+                        </span>
+
+                        @if (!string.IsNullOrWhiteSpace(info.Pais))
+                        {
+                            <span>
+                                <i class="bi bi-geo-alt"></i>
+                                @info.Pais
+                            </span>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(info.Nota))
+                    {
+                        <p class="misionero-note">
+                            @info.Nota
+                        </p>
+                    }
+                </div>
+            </div>
+
+            <form method="get"
+                  class="filter-card misionero-year-filter">
+
+                <input type="hidden"
+                       name="IdMisionero"
+                       value="@Model.IdMisionero" />
+
+                <div class="filter-field">
+                    <label for="Anio">
+                        Año analizado
+                    </label>
+
+                    <select id="Anio"
+                            name="Anio"
+                            class="form-select form-select-sm"
+                            onchange="this.form.submit()">
+
+                        @foreach (var anio in Model.AniosDisponibles)
+                        {
+                            <option value="@anio"
+                                    selected="@(anio == Model.AnioSeleccionado)">
+                                @anio
+                            </option>
+                        }
+                    </select>
+                </div>
+            </form>
+        </div>
+
+        <!-- NAVEGACIÓN INTERNA -->
+        <nav class="misionero-section-nav">
+            <a href="#resumen">
+                Resumen
+            </a>
+
+            <a href="#fondos">
+                Fondos
+            </a>
+
+            <a href="#comportamiento">
+                Comportamiento
+            </a>
+
+            <a href="#patrocinadores">
+                Patrocinadores
+            </a>
+
+            <a href="#planillas">
+                Planillas
+            </a>
+
+            <a href="#movimientos">
+                Movimientos
+            </a>
+
+            <a href="#prestamos">
+                Préstamos
+            </a>
+        </nav>
+
+        <!-- KPI -->
+        <section id="resumen"
+                 class="row g-3 mb-3">
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <article class="kpi-card"
+                         style="--kpi-accent:#1f2758; --kpi-soft:#eef0f8;">
+                    <div class="kpi-card-body">
+                        <div class="kpi-icon">
+                            <i class="bi bi-clock-history"></i>
+                        </div>
+
+                        <div class="kpi-content">
+                            <div class="kpi-label">
+                                Saldo inicial
+                            </div>
+
+                            <div class="kpi-value kpi-value-responsive">
+                                @Dinero(resumen.SaldoInicial)
+                            </div>
+
+                            <div class="kpi-note">
+                                Cierre al
+                                @(info.FechaInicial
+                                    .AddDays(-1)
+                                    .ToString("dd/MM/yyyy"))
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <article class="kpi-card"
+                         style="--kpi-accent:#1769aa; --kpi-soft:#e9f3fb;">
+                    <div class="kpi-card-body">
+                        <div class="kpi-icon">
+                            <i class="bi bi-cash-stack"></i>
+                        </div>
+
+                        <div class="kpi-content">
+                            <div class="kpi-label">
+                                Aportes recibidos
+                            </div>
+
+                            <div class="kpi-value kpi-value-responsive">
+                                @Dinero(resumen.IngresosPeriodo)
+                            </div>
+
+                            <div class="kpi-note">
+                                @resumen.CantidadIngresos
+                                ingresos · Último:
+                                @Fecha(resumen.UltimoIngreso)
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <article class="kpi-card"
+                         style="--kpi-accent:#d8292f; --kpi-soft:#fdeced;">
+                    <div class="kpi-card-body">
+                        <div class="kpi-icon">
+                            <i class="bi bi-send-check"></i>
+                        </div>
+
+                        <div class="kpi-content">
+                            <div class="kpi-label">
+                                Entregas realizadas
+                            </div>
+
+                            <div class="kpi-value kpi-value-responsive">
+                                @Dinero(resumen.EntregasPeriodo)
+                            </div>
+
+                            <div class="kpi-note">
+                                @resumen.CantidadPlanillas
+                                planillas ·
+                                @Porcentaje(resumen.PorcentajeEntregado)
+                                entregado
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <article class="kpi-card"
+                         style="--kpi-accent:#16803c; --kpi-soft:#eaf7ef;">
+                    <div class="kpi-card-body">
+                        <div class="kpi-icon">
+                            <i class="bi bi-wallet2"></i>
+                        </div>
+
+                        <div class="kpi-content">
+                            <div class="kpi-label">
+                                Saldo actual
+                            </div>
+
+                            <div class="kpi-value kpi-value-responsive">
+                                @Dinero(resumen.SaldoFinal)
+                            </div>
+
+                            <div class="kpi-note positive">
+                                Fondo bruto acumulado
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <!-- SALDOS POR TIPO DE FONDO -->
+        <section id="fondos"
+                 class="dashboard-card mb-3">
+
+            <header class="dashboard-card-header">
+                <div class="card-heading">
+                    <h2>Saldos por tipo de fondo</h2>
+
+                    <p>
+                        Saldo acumulado por concepto y distribución porcentual
+                        de los saldos positivos. Los segmentos menores se
+                        amplían visualmente para poder identificarlos.
+                    </p>
+                </div>
+
+                <span class="card-badge">
+                    Saldo distribuido: @Dinero(totalSaldosDistribuidos)
+                </span>
+            </header>
+
+            <div class="row g-0">
+                <div class="col-12 col-xl-5 border-end">
+                    <div class="misionero-funds-chart-container">
+                        <canvas id="misioneroFundsChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="col-12 col-xl-7">
+                    <div class="dashboard-table-wrapper">
+                        <table class="dashboard-table table align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Concepto</th>
+                                    <th>Clasificación</th>
+                                    <th class="text-end">Saldo</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @if (fondosPorConcepto.Count > 0)
+                                {
+                                    @foreach (var fondo in fondosPorConcepto)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <strong class="entity-name">
+                                                    @fondo.Concepto
+                                                </strong>
+                                            </td>
+
+                                            <td>
+                                                <span class="misionero-movement-type @(fondo.EsRetencion ? "payment" : "income")">
+                                                    @(fondo.EsRetencion
+                                                        ? "Retención"
+                                                        : "Fondo del misionero")
+                                                </span>
+                                            </td>
+
+                                            <td class="text-end table-money @(fondo.Saldo < 0 ? "text-danger" : string.Empty)">
+                                                @Dinero(fondo.Saldo)
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="3"
+                                            class="table-empty">
+                                            No hay movimientos de fondos registrados.
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VARIACIÓN -->
+        <section class="dashboard-card mb-3">
+            <div class="dashboard-card-body">
+                <div class="misionero-variation">
+                    <div class="misionero-variation-icon @ClaseVariacion()">
+                        <i class="bi @IconoVariacion()"></i>
+                    </div>
+
+                    <div class="misionero-variation-copy">
+                        <span>
+                            Variación frente al mismo período de
+                            @(Model.AnioSeleccionado - 1)
+                        </span>
+
+                        <strong class="@ClaseVariacion()">
+                            @if (comparacion.EstadoVariacion == "NUEVO")
+                            {
+                                <text>
+                                    Nuevo ingreso durante el período
+                                </text>
+                            }
+                            else
+                            {
+                                <text>
+                                    @Porcentaje(comparacion.VariacionPorcentual)
+                                </text>
+                            }
+                        </strong>
+
+                        <p>
+                            @Dinero(comparacion.IngresosPeriodoActual)
+                            en @Model.AnioSeleccionado frente a
+                            @Dinero(comparacion.IngresosPeriodoAnterior)
+                            del
+                            @comparacion.FechaInicialAnterior.ToString("dd/MM/yyyy")
+                            al
+                            @comparacion.FechaFinalAnterior.ToString("dd/MM/yyyy").
+                        </p>
+                    </div>
+
+                    <div class="misionero-variation-amount @ClaseVariacion()">
+                        @Dinero(comparacion.VariacionMonto)
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- GRÁFICO Y RESUMEN PATROCINADORES -->
+        <div id="comportamiento"
+             class="row g-3 mb-3">
+
+            <div class="col-12 col-xxl-8">
+                <section class="dashboard-card">
+                    <header class="dashboard-card-header">
+                        <div class="card-heading">
+                            <h2>
+                                Comportamiento mensual
+                            </h2>
+
+                            <p>
+                                Aportes de @Model.AnioSeleccionado frente a
+                                @(Model.AnioSeleccionado - 1).
+                            </p>
+                        </div>
+                    </header>
+
+                    <div class="dashboard-card-body">
+                        <div class="misionero-chart-container">
+                            <canvas id="misioneroMonthlyChart"></canvas>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-12 col-xxl-4">
+                <section class="dashboard-card h-100">
+                    <header class="dashboard-card-header">
+                        <div class="card-heading">
+                            <h2>
+                                Red de patrocinadores
+                            </h2>
+
+                            <p>
+                                Concentración del ingreso anual.
+                            </p>
+                        </div>
+                    </header>
+
+                    <div class="dashboard-card-body">
+                        <div class="misionero-insight-list">
+
+                            <div class="misionero-insight">
+                                <span class="misionero-insight-icon blue">
+                                    <i class="bi bi-pie-chart"></i>
+                                </span>
+
+                                <div>
+                                    <span>
+                                        Origen del 80%
+                                    </span>
+
+                                    <strong>
+                                        @patrocinadores.CantidadPatrocinadores80
+                                        patrocinadores
+                                    </strong>
+                                </div>
+                            </div>
+
+                            <div class="misionero-insight">
+                                <span class="misionero-insight-icon green">
+                                    <i class="bi bi-trophy"></i>
+                                </span>
+
+                                <div>
+                                    <span>
+                                        Principal patrocinador
+                                    </span>
+
+                                    <strong>
+                                        @patrocinadores.PrincipalPatrocinador
+                                    </strong>
+
+                                    <small>
+                                        @Dinero(patrocinadores.TotalPrincipalPatrocinador)
+                                        ·
+                                        @Porcentaje(patrocinadores.ParticipacionPrincipal)
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="misionero-insight">
+                                <span class="misionero-insight-icon orange">
+                                    <i class="bi bi-signpost-split"></i>
+                                </span>
+
+                                <div>
+                                    <span>
+                                        Distrito principal
+                                    </span>
+
+                                    <strong>
+                                        @patrocinadores.DistritoPrincipal
+                                    </strong>
+
+                                    <small>
+                                        @Dinero(patrocinadores.TotalDistritoPrincipal)
+                                    </small>
+                                </div>
+                            </div>
+
+                            <div class="misionero-insight">
+                                <span class="misionero-insight-icon red">
+                                    <i class="bi bi-graph-down"></i>
+                                </span>
+
+                                <div>
+                                    <span>
+                                        Por debajo del promedio
+                                    </span>
+
+                                    <strong>
+                                        @patrocinadores.CantidadBajoPromedio
+                                        aportantes
+                                    </strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- TABLA MENSUAL -->
+        <section class="dashboard-card mb-3">
+            <header class="dashboard-card-header">
+                <div class="card-heading">
+                    <h2>
+                        Conciliación mensual
+                    </h2>
+
+                    <p>
+                        Evolución del saldo durante
+                        @Model.AnioSeleccionado.
+                    </p>
+                </div>
+
+                <span class="card-badge">
+                    @mensual.Count meses
+                </span>
+            </header>
+
+            <div class="dashboard-table-wrapper">
+                <table class="dashboard-table table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Mes</th>
+                            <th class="text-end">Saldo inicial</th>
+                            <th class="text-end">Aportes</th>
+                            <th class="text-end">
+                                Año anterior
+                            </th>
+                            <th class="text-end">Variación</th>
+                            <th class="text-end">Entregas</th>
+                            <th class="text-end">Saldo final</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach (var mes in mensual)
+                        {
+                            <tr>
+                                <td>
+                                    <strong class="entity-name">
+                                        @mes.Mes
+                                    </strong>
+                                </td>
+
+                                <td class="text-end">
+                                    @Dinero(mes.SaldoInicial)
+                                </td>
+
+                                <td class="text-end table-money">
+                                    @Dinero(mes.Ingresos)
+                                </td>
+
+                                <td class="text-end">
+                                    @Dinero(mes.IngresosAnioAnterior)
+                                </td>
+
+                                <td class="text-end">
+                                    <span class="misionero-month-change @(mes.VariacionInteranual < 0 ? "negative" : mes.VariacionInteranual > 0 ? "positive" : string.Empty)">
+                                        @Porcentaje(mes.VariacionInteranualPorcentual)
+                                    </span>
+                                </td>
+
+                                <td class="text-end">
+                                    @Dinero(mes.Entregas)
+                                </td>
+
+                                <td class="text-end table-money">
+                                    @Dinero(mes.SaldoFinal)
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- PRINCIPALES PATROCINADORES -->
+        <section id="patrocinadores"
+                 class="dashboard-card mb-3">
+
+            <header class="dashboard-card-header">
+                <div class="card-heading">
+                    <h2>
+                        Principales patrocinadores
+                    </h2>
+
+                    <p>
+                        Aportantes necesarios para alcanzar o superar
+                        el 80% de los ingresos.
+                    </p>
+                </div>
+
+                <span class="card-badge">
+                    @Model.Detalle.PrincipalesPatrocinadores.Count
+                    patrocinadores
+                </span>
+            </header>
+
+            <div class="dashboard-table-wrapper">
+                <table class="dashboard-table table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Patrocinador</th>
+                            <th>Tipo</th>
+                            <th>Distrito</th>
+                            <th class="text-end">Aportado</th>
+                            <th class="text-end">Participación</th>
+                            <th class="text-end">Acumulado</th>
+                            <th class="text-end">Meses activos</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach (
+                            var patrocinador
+                            in Model.Detalle.PrincipalesPatrocinadores)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="table-entity">
+                                        <span class="entity-avatar entity-avatar-blue">
+                                            <i class="bi bi-heart"></i>
+                                        </span>
+
+                                        <div>
+                                            <div class="entity-name">
+                                                @patrocinador.Aportante
+                                            </div>
+
+                                            <div class="table-subtitle">
+                                                Código
+                                                @patrocinador.CodigoAportante
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <td>
+                                    <span class="misionero-donor-type">
+                                        @patrocinador.TipoDonante
+                                    </span>
+                                </td>
+
+                                <td>
+                                    @patrocinador.Distrito
+                                </td>
+
+                                <td class="text-end table-money">
+                                    @Dinero(patrocinador.TotalAportado)
+                                </td>
+
+                                <td class="text-end">
+                                    @Porcentaje(patrocinador.Participacion)
+                                </td>
+
+                                <td class="text-end">
+                                    @Porcentaje(patrocinador.ParticipacionAcumulada)
+                                </td>
+
+                                <td class="text-end">
+                                    @patrocinador.MesesConAporte
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- PROMEDIOS Y SIN APORTE -->
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-xl-7">
+                <section class="dashboard-card h-100">
+                    <header class="dashboard-card-header">
+                        <div class="card-heading">
+                            <h2>
+                                Promedio por tipo de donante
+                            </h2>
+
+                            <p>
+                                Cada aportante se compara solamente
+                                contra su propia categoría.
+                            </p>
+                        </div>
+                    </header>
+
+                    <div class="dashboard-table-wrapper">
+                        <table class="dashboard-table table align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Tipo</th>
+                                    <th class="text-end">Aportantes</th>
+                                    <th class="text-end">Total</th>
+                                    <th class="text-end">Promedio</th>
+                                    <th class="text-end">Bajo promedio</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach (
+                                    var tipo
+                                    in Model.Detalle.TiposDonante)
+                                {
+                                    <tr>
+                                        <td>
+                                            <strong>
+                                                @tipo.TipoDonante
+                                            </strong>
+                                        </td>
+
+                                        <td class="text-end">
+                                            @tipo.CantidadAportantes
+                                        </td>
+
+                                        <td class="text-end table-money">
+                                            @Dinero(tipo.TotalAportado)
+                                        </td>
+
+                                        <td class="text-end">
+                                            @Dinero(tipo.PromedioAporte)
+                                        </td>
+
+                                        <td class="text-end">
+                                            @tipo.CantidadBajoPromedio
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-12 col-xl-5">
+                <section class="dashboard-card h-100">
+                    <header class="dashboard-card-header">
+                        <div class="card-heading">
+                            <h2>
+                                Oportunidades de patrocinio
+                            </h2>
+
+                            <p>
+                                Aportantes sin contribución al misionero.
+                            </p>
+                        </div>
+                    </header>
+
+                    <div class="dashboard-card-body">
+                        <div class="misionero-opportunity-grid">
+                            <div>
+                                <span>
+                                    Nunca han aportado
+                                </span>
+
+                                <strong>
+                                    @patrocinadores.CantidadNuncaAportaron
+                                </strong>
+
+                                <small>
+                                    Sin relación histórica
+                                </small>
+                            </div>
+
+                            <div>
+                                <span>
+                                    Sin aporte en
+                                    @Model.AnioSeleccionado
+                                </span>
+
+                                <strong>
+                                    @patrocinadores.CantidadSinAportePeriodo
+                                </strong>
+
+                                <small>
+                                    Aportaron en años anteriores
+                                </small>
+                            </div>
+                        </div>
+
+                        <button type="button"
+                                class="btn btn-outline-primary btn-sm w-100 mt-3"
+                                disabled
+                                title="La página completa se construirá en la siguiente etapa">
+                            Ver aportantes sin contribución
+                            <i class="bi bi-arrow-right ms-1"></i>
+                        </button>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- BAJO PROMEDIO -->
+        <section class="dashboard-card mb-3">
+            <header class="dashboard-card-header">
+                <div class="card-heading">
+                    <h2>
+                        Aportantes por debajo del promedio
+                    </h2>
+
+                    <p>
+                        Comparación contra el promedio anual de su
+                        tipo de donante.
+                    </p>
+                </div>
+
+                <span class="card-badge">
+                    Mostrando @bajoPromedio.Count
+                </span>
+            </header>
+
+            <div class="dashboard-table-wrapper">
+                <table class="dashboard-table table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Aportante</th>
+                            <th>Tipo</th>
+                            <th class="text-end">Aporte</th>
+                            <th class="text-end">Promedio</th>
+                            <th class="text-end">Cumplimiento</th>
+                            <th class="text-end">Último aporte</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach (var aportante in bajoPromedio)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="entity-name">
+                                        @aportante.Aportante
+                                    </div>
+
+                                    <div class="table-subtitle">
+                                        @aportante.Distrito
+                                    </div>
+                                </td>
+
+                                <td>
+                                    @aportante.TipoDonante
+                                </td>
+
+                                <td class="text-end">
+                                    @Dinero(aportante.TotalAportado)
+                                </td>
+
+                                <td class="text-end">
+                                    @Dinero(aportante.PromedioTipoDonante)
+                                </td>
+
+                                <td class="text-end">
+                                    <span class="misionero-average-status @(aportante.CumplimientoPromedio < 50 ? "low" : aportante.CumplimientoPromedio < 75 ? "warning" : string.Empty)">
+                                        @Porcentaje(aportante.CumplimientoPromedio)
+                                    </span>
+                                </td>
+
+                                <td class="text-end">
+                                    @Fecha(aportante.UltimoAporte)
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- DISTRITOS -->
+        <section class="dashboard-card mb-3">
+            <header class="dashboard-card-header">
+                <div class="card-heading">
+                    <h2>
+                        Aportes por distrito
+                    </h2>
+
+                    <p>
+                        Concentración territorial de los ingresos.
+                    </p>
+                </div>
+            </header>
+
+            <div class="dashboard-card-body">
+                <div class="misionero-district-list">
+                    @foreach (var distrito in distritos)
+                    {
+                        var ancho =
+                            Math.Clamp(
+                                distrito.Participacion,
+                                0,
+                                100
+                            );
+
+                        <div class="misionero-district-row">
+                            <div>
+                                <strong>
+                                    @distrito.Distrito
+                                </strong>
+
+                                <span>
+                                    @distrito.CantidadAportantes
+                                    aportantes ·
+                                    @distrito.CantidadAportes
+                                    aportes
+                                </span>
+                            </div>
+
+                            <div class="misionero-district-progress">
+                                <span style="width:@ancho.ToString("0.##", CultureInfo.InvariantCulture)%"></span>
+                            </div>
+
+                            <div class="text-end">
+                                <strong>
+                                    @Dinero(distrito.TotalAportado)
+                                </strong>
+
+                                <span>
+                                    @Porcentaje(distrito.Participacion)
+                                </span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <!-- PLANILLAS -->
+        <section id="planillas"
+                 class="dashboard-card mb-3">
+
+            <header class="dashboard-card-header">
+                <div class="card-heading">
+                    <h2>
+                        Planillas recientes
+                    </h2>
+
+                    <p>
+                        Entregas registradas durante el período.
+                    </p>
+                </div>
+
+                <span class="card-badge">
+                    @resumen.CantidadPlanillas planillas
+                </span>
+            </header>
+
+            <div class="dashboard-table-wrapper">
+                <table class="dashboard-table table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Planilla</th>
+                            <th>Fecha</th>
+                            <th>Concepto</th>
+                            <th class="text-end">
+                                Neto entregado
+                            </th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @if (Model.Detalle.Planillas.Count > 0)
+                        {
+                            @foreach (
+                                var planilla
+                                in Model.Detalle.Planillas)
+                            {
+                                <tr>
+                                    <td>
+                                        <strong>
+                                            @planilla.NoPlanilla
+                                        </strong>
+                                    </td>
+
+                                    <td>
+                                        @planilla.Fecha.ToString(
+                                            "dd/MM/yyyy"
+                                        )
+                                    </td>
+
+                                    <td>
+                                        @planilla.Concepto
+                                    </td>
+
+                                    <td class="text-end table-money">
+                                        @Dinero(planilla.NetoEntregado)
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="4"
+                                    class="table-empty">
+                                    No hay planillas durante el período.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- PRÉSTAMOS -->
+        <section id="prestamos"
+                 class="dashboard-card mb-3">
+
+            <header class="dashboard-card-header">
+                <div class="card-heading">
+                    <h2>Préstamos pendientes</h2>
+
+                    <p>
+                        Capital otorgado, abonos aplicados y saldo por pagar.
+                    </p>
+                </div>
+
+                <span class="card-badge">
+                    @Model.Detalle.Prestamos.Count pendientes
+                </span>
+            </header>
+
+            <div class="dashboard-table-wrapper">
+                <table class="dashboard-table table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Préstamo</th>
+                            <th>Fecha</th>
+                            <th>Concepto</th>
+                            <th class="text-end">Monto original</th>
+                            <th class="text-end">Saldo pendiente</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @if (Model.Detalle.Prestamos.Count > 0)
+                        {
+                            @foreach (var prestamo in Model.Detalle.Prestamos)
+                            {
+                                <tr>
+                                    <td>
+                                        <strong>@prestamo.NoPrestamo</strong>
+                                    </td>
+
+                                    <td>
+                                        @prestamo.Fecha.ToString("dd/MM/yyyy")
+                                    </td>
+
+                                    <td>@prestamo.Concepto</td>
+
+                                    <td class="text-end">
+                                        @Dinero(prestamo.Monto)
+                                    </td>
+
+                                    <td class="text-end table-money">
+                                        @Dinero(prestamo.Saldo)
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="5"
+                                    class="table-empty">
+                                    El misionero no tiene préstamos pendientes.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- MOVIMIENTOS -->
+        <section id="movimientos"
+                 class="dashboard-card">
+
+            <header class="dashboard-card-header">
+                <div class="card-heading">
+                    <h2>
+                        Movimientos recientes
+                    </h2>
+
+                    <p>
+                        Aportes y entregas en orden cronológico.
+                    </p>
+                </div>
+
+                <span class="card-badge">
+                    Últimos @Model.Detalle.Movimientos.Count
+                </span>
+            </header>
+
+            <div class="dashboard-table-wrapper">
+                <table class="dashboard-table table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Tipo</th>
+                            <th>Documento</th>
+                            <th>Concepto</th>
+                            <th class="text-end">Entrada</th>
+                            <th class="text-end">Salida</th>
+                            <th class="text-end">Saldo</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach (
+                            var movimiento
+                            in Model.Detalle.Movimientos)
+                        {
+                            <tr>
+                                <td>
+                                    @movimiento.Fecha.ToString(
+                                        "dd/MM/yyyy"
+                                    )
+                                </td>
+
+                                <td>
+                                    <span class="misionero-movement-type @(movimiento.Tipo == "INGRESO" ? "income" : "payment")">
+                                        @movimiento.Tipo
+                                    </span>
+                                </td>
+
+                                <td>
+                                    @movimiento.Documento
+                                </td>
+
+                                <td>
+                                    @movimiento.Concepto
+                                </td>
+
+                                <td class="text-end table-money-success">
+                                    @(movimiento.Entrada > 0
+                                        ? Dinero(movimiento.Entrada)
+                                        : "—")
+                                </td>
+
+                                <td class="text-end">
+                                    @(movimiento.Salida > 0
+                                        ? Dinero(movimiento.Salida)
+                                        : "—")
+                                </td>
+
+                                <td class="text-end table-money">
+                                    @Dinero(movimiento.SaldoAcumulado)
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    }
+</div>
+
+@section Scripts
+{
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js">
+    </script>
+
+    <script>
+        (() => {
+            const mensual =
+                @Html.Raw(
+                        JsonSerializer.Serialize(
+                                mensual.Select(x => new
+                                {
+                                        x.Mes,
+                                        x.Ingresos,
+                                        x.IngresosAnioAnterior
+                                })
+                        )
+                );
+
+            const canvas =
+                document.getElementById(
+                    "misioneroMonthlyChart"
+                );
+
+            if (!canvas || mensual.length === 0) {
+                return;
+            }
+
+            new Chart(
+                canvas,
+                {
+                    type: "bar",
+
+                    data: {
+                        labels:
+                            mensual.map(x => x.Mes),
+
+                        datasets: [
+                            {
+                                label:
+                                    "Aportes @Model.AnioSeleccionado",
+
+                                data:
+                                    mensual.map(x => x.Ingresos),
+
+                                backgroundColor:
+                                    "#1f2758",
+
+                                borderRadius: 5
+                            },
+                            {
+                                label:
+                                    "Aportes @(Model.AnioSeleccionado - 1)",
+
+                                data:
+                                    mensual.map(
+                                        x => x.IngresosAnioAnterior
+                                    ),
+
+                                backgroundColor:
+                                    "#98a2b3",
+                                borderRadius: 5
+                            }
+                        ]
+                    },
+
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+
+                        interaction: {
+                            intersect: false,
+                            mode: "index"
+                        },
+
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+
+                                grid: {
+                                    color: "#e8ebf2"
+                                },
+
+                                ticks: {
+                                    callback:
+                                        value =>
+                                            `C$ ${Number(
+                                                value
+                                            ).toLocaleString(
+                                                "es-NI"
+                                            )}`
+                                }
+                            }
+                        },
+
+                        plugins: {
+                            legend: {
+                                position: "bottom"
+                            },
+
+                            tooltip: {
+                                callbacks: {
+                                    label:
+                                        context =>
+                                            `${context.dataset.label}: C$ ${Number(
+                                                context.parsed.y
+                                            ).toLocaleString(
+                                                "es-NI",
+                                                {
+                                                    minimumFractionDigits: 2
+                                                }
+                                            )}`
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+        })();
+    </script>
+
+    <script>
+        (() => {
+            const fondos =
+                @Html.Raw(
+                    JsonSerializer.Serialize(
+                        fondosPorConcepto
+                            .Where(x => x.Saldo > 0)
+                            .Select(x => new
+                            {
+                                x.Concepto,
+                                x.Saldo,
+                                x.EsRetencion
+                            })
+                    )
+                );
+
+            const canvas =
+                document.getElementById("misioneroFundsChart");
+
+            if (!canvas || fondos.length === 0) {
+                return;
+            }
+
+            const coloresFondos = [
+                "#1f2758",
+                "#1769aa",
+                "#16803c",
+                "#7c3aed",
+                "#0891b2"
+            ];
+
+            const coloresRetenciones = [
+                "#d8292f",
+                "#e67e22",
+                "#b45309",
+                "#be123c"
+            ];
+
+            let indiceFondo = 0;
+            let indiceRetencion = 0;
+
+            const colores =
+                fondos.map(fondo => {
+                    if (fondo.EsRetencion) {
+                        const color =
+                            coloresRetenciones[
+                                indiceRetencion % coloresRetenciones.length
+                            ];
+
+                        indiceRetencion++;
+                        return color;
+                    }
+
+                    const color =
+                        coloresFondos[
+                            indiceFondo % coloresFondos.length
+                        ];
+
+                    indiceFondo++;
+                    return color;
+                });
+
+            const total =
+                fondos.reduce(
+                    (acumulado, fondo) =>
+                        acumulado + Number(fondo.Saldo),
+                    0
+                );
+
+            const valorMinimoVisual =
+                total * 0.005;
+
+            const valoresVisuales =
+                fondos.map(
+                    fondo =>
+                        Math.max(
+                            Number(fondo.Saldo),
+                            valorMinimoVisual
+                        )
+                );
+
+            new Chart(
+                canvas,
+                {
+                    type: "doughnut",
+
+                    data: {
+                        labels:
+                            fondos.map(x => x.Concepto),
+
+                        datasets: [
+                            {
+                                data:
+                                    valoresVisuales,
+
+                                backgroundColor: colores,
+                                borderColor: "#ffffff",
+                                borderWidth: 3,
+                                hoverOffset: 6
+                            }
+                        ]
+                    },
+
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: "58%",
+
+                        plugins: {
+                            legend: {
+                                position: "bottom",
+
+                                labels: {
+                                    usePointStyle: true,
+                                    boxWidth: 8,
+
+                                    generateLabels: chart => {
+                                        const etiquetas =
+                                            Chart.defaults.plugins.legend.labels
+                                                .generateLabels(chart);
+
+                                        return etiquetas.map(
+                                            (etiqueta, indice) => {
+                                                const saldo =
+                                                    Number(
+                                                        fondos[indice].Saldo
+                                                    );
+
+                                                const porcentaje =
+                                                    total === 0
+                                                        ? 0
+                                                        : saldo * 100 / total;
+
+                                                etiqueta.text =
+                                                    `${fondos[indice].Concepto} (${porcentaje.toFixed(1)}%)`;
+
+                                                return etiqueta;
+                                            }
+                                        );
+                                    }
+                                }
+                            },
+
+                            tooltip: {
+                                callbacks: {
+                                    label: context => {
+                                        const valor =
+                                            Number(
+                                                fondos[
+                                                    context.dataIndex
+                                                ].Saldo
+                                            );
+
+                                        const porcentaje =
+                                            total === 0
+                                                ? 0
+                                                : valor * 100 / total;
+
+                                        return `${context.label}: C$ ${valor.toLocaleString(
+                                            "es-NI",
+                                            {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2
+                                            }
+                                        )} (${porcentaje.toFixed(1)}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            );
+        })();
+    </script>
+}

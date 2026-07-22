@@ -293,6 +293,7 @@
                                         <th class="text-end">Disponible para desembolso</th>
                                         <th>% entregado</th>
                                         <th>Estado</th>
+                                        <th class="text-end">Acción</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -330,6 +331,15 @@
                                                 <span class="misionero-status @ClaseEstado(registro.EstadoSaldo)">
                                                     @TextoEstado(registro.EstadoSaldo)
                                                 </span>
+                                            </td>
+                                            <td class="text-end">
+                                                <a asp-page="./Detalle"
+                                                   asp-route-IdMisionero="@registro.IdMisionero"
+                                                   asp-route-Anio="@DateTime.Today.Year"
+                                                   class="btn btn-sm btn-outline-primary">
+                                                    Ver ficha
+                                                    <i class="bi bi-arrow-right ms-1"></i>
+                                                </a>
                                             </td>
                                         </tr>
                                     }
